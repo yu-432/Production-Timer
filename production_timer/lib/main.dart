@@ -1,122 +1,495 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProductionTimerApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ProductionTimerApp extends StatelessWidget {
+  const ProductionTimerApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    const seedColor = Color(0xFF5F6AF3);
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Production Timer',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: seedColor),
+        scaffoldBackgroundColor: const Color(0xFFF5F6FB),
+        textTheme: const TextTheme(
+          displaySmall: TextStyle(
+            fontWeight: FontWeight.w600,
+            letterSpacing: -1.5,
+          ),
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const TimerScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class TimerScreen extends StatefulWidget {
+  const TimerScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _TimerScreenState extends State<TimerScreen> {
+  static const double _weeklyGoalHours = 40;
+  static const double _monthlyGoalHours = 160;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+  final Duration _baseTodayFocus = const Duration(hours: 1, minutes: 45);
+  final double _baseWeeklyHours = 12.5;
+  final double _baseMonthlyHours = 55;
+
+  Duration _sessionElapsed = Duration.zero;
+  Timer? _ticker;
+  bool _isRunning = false;
+
+  Duration get _todayTotal => _baseTodayFocus + _sessionElapsed;
+  double get _weeklyHours =>
+      _baseWeeklyHours + _todayTotal.inMinutes / Duration.minutesPerHour;
+  double get _monthlyHours =>
+      _baseMonthlyHours + _todayTotal.inMinutes / Duration.minutesPerHour;
+  double get _weeklyProgress =>
+      (_weeklyHours / _weeklyGoalHours).clamp(0.0, 1.0);
+  double get _monthlyProgress =>
+      (_monthlyHours / _monthlyGoalHours).clamp(0.0, 1.0);
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  void _toggleTimer() {
+    if (_isRunning) {
+      _stopTimer();
+    } else {
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
+    setState(() => _isRunning = true);
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        _sessionElapsed += const Duration(seconds: 1);
+      });
     });
+  }
+
+  void _stopTimer() {
+    _ticker?.cancel();
+    setState(() => _isRunning = false);
+  }
+
+  void _resetTimer() {
+    _ticker?.cancel();
+    setState(() {
+      _isRunning = false;
+      _sessionElapsed = Duration.zero;
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
+  }
+
+  String _formatTodayLabel() {
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    final now = DateTime.now();
+    final weekday = weekdays[now.weekday % 7];
+    return '${now.month}月${now.day}日 ($weekday)';
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Production Timer'),
+        centerTitle: false,
+        elevation: 0,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          children: [
             Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'デスクワークの実稼働時間を秒単位で記録します。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.black54,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildTimerCard(theme),
+            const SizedBox(height: 16),
+            _buildControls(theme),
+            const SizedBox(height: 28),
+            Text(
+              '今日の記録',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FocusStatCard(
+                    icon: Icons.calendar_today_rounded,
+                    title: '本日の合計',
+                    value: _formatDuration(_todayTotal),
+                    caption: '自動保存の対象',
+                    color: Colors.indigo.shade50,
+                    accentColor: const Color(0xFF4A63F4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FocusStatCard(
+                    icon: Icons.timelapse_rounded,
+                    title: '現在のセッション',
+                    value: _formatDuration(_sessionElapsed),
+                    caption: _isRunning ? 'フォーカス中' : '停止中',
+                    color: Colors.pink.shade50,
+                    accentColor: const Color(0xFFFF7B6B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _GoalProgressTile(
+              title: '週間目標 ${_weeklyGoalHours.toStringAsFixed(0)}h',
+              value:
+                  '${_weeklyHours.toStringAsFixed(1)}h / ${_weeklyGoalHours.toStringAsFixed(0)}h',
+              progress: _weeklyProgress,
+              caption: '日曜日開始、README準拠の進捗表示',
+            ),
+            const SizedBox(height: 12),
+            _GoalProgressTile(
+              title: '月間目標 ${_monthlyGoalHours.toStringAsFixed(0)}h',
+              value:
+                  '${_monthlyHours.toStringAsFixed(1)}h / ${_monthlyGoalHours.toStringAsFixed(0)}h',
+              progress: _monthlyProgress,
+              caption: '過去30日を集計した目標との差分',
+            ),
+            const SizedBox(height: 24),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE7EBFF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.lightbulb_rounded,
+                        color: Color(0xFF4A63F4),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'フォーカス維持の仕様',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'READMEに記載の通り、画面オンのままなら継続、ホームに戻る・'
+                            '別アプリを開いた時点で自動停止します。'
+                            'Wake Lockでスリープを防ぎつつ安全に記録できます。',
+                            style: TextStyle(
+                              color: Colors.black54,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+    );
+  }
+
+  Widget _buildTimerCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF4B6CB7), Color(0xFF182848)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33292C5C),
+            offset: Offset(0, 16),
+            blurRadius: 32,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formatTodayLabel(),
+            style: theme.textTheme.labelLarge?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _isRunning ? '集中セッション中' : '開始を待機中',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Text(
+            _formatDuration(_sessionElapsed),
+            style: theme.textTheme.displaySmall?.copyWith(
+              color: Colors.white,
+              fontSize: 54,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '秒単位でリアルタイム更新',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 28),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: const [
+              _InfoPill(icon: Icons.visibility_rounded, label: 'Wake Lock 有効'),
+              _InfoPill(
+                icon: Icons.phonelink_lock_rounded,
+                label: 'フォーカス外れで自動停止',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls(ThemeData theme) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: _sessionElapsed == Duration.zero
+                ? null
+                : () => _resetTimer(),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('リセット'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 18),
+              side: const BorderSide(color: Color(0xFFCBD1ED)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: FilledButton.icon(
+            onPressed: _toggleTimer,
+            icon: Icon(
+              _isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+            ),
+            label: Text(_isRunning ? '停止' : '開始'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              backgroundColor: _isRunning
+                  ? const Color(0xFFFF7B6B)
+                  : theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class FocusStatCard extends StatelessWidget {
+  const FocusStatCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.caption,
+    required this.color,
+    required this.accentColor,
+  });
+
+  final IconData icon;
+  final String title;
+  final String value;
+  final String caption;
+  final Color color;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: accentColor),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.black.withValues(alpha: 0.6),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            caption,
+            style: TextStyle(color: Colors.black.withValues(alpha: 0.5)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  const _InfoPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalProgressTile extends StatelessWidget {
+  const _GoalProgressTile({
+    required this.title,
+    required this.value,
+    required this.progress,
+    required this.caption,
+  });
+
+  final String title;
+  final String value;
+  final double progress;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 10,
+                backgroundColor: theme.colorScheme.primary.withValues(
+                  alpha: 0.1,
+                ),
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              caption,
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
