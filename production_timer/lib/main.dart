@@ -81,125 +81,134 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         centerTitle: false,
         elevation: 0,
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            Text(
-              'デスクワークの実稼働時間をRiverpod経由で管理し、Hiveに自動保存します。',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: Colors.black54,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildTimerCard(theme, timerState),
-            const SizedBox(height: 16),
-            _buildControls(theme, timerState),
-            const SizedBox(height: 28),
-            Text(
-              '今日の記録',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                Expanded(
-                  child: FocusStatCard(
-                    icon: Icons.calendar_today_rounded,
-                    title: '本日の合計',
-                    value: _formatDuration(focusStats.todayTotal),
-                    caption: 'Hiveに30秒間隔で自動保存',
-                    color: Colors.indigo.shade50,
-                    accentColor: const Color(0xFF4A63F4),
+                Text(
+                  'デスクワークの実稼働時間をRiverpod経由で管理し、Hiveに自動保存します。',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.black54,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FocusStatCard(
-                    icon: Icons.timelapse_rounded,
-                    title: '現在のセッション',
-                    value: _formatDuration(timerState.sessionElapsed),
-                    caption: timerState.isRunning
-                        ? 'フォーカス中'
-                        : (timerState.hasActiveRecord ? '再開待機' : '停止中'),
-                    color: Colors.pink.shade50,
-                    accentColor: const Color(0xFFFF7B6B),
+                const SizedBox(height: 16),
+                _buildTimerCard(theme, timerState),
+                const SizedBox(height: 16),
+                _buildControls(theme, timerState),
+                const SizedBox(height: 28),
+                Text(
+                  '今日の記録',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _GoalProgressTile(
-              title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
-              value:
-                  '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
-              progress: weeklyProgress,
-              caption: '過去7日間の記録を自動集計',
-            ),
-            const SizedBox(height: 12),
-            _GoalProgressTile(
-              title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
-              value:
-                  '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
-              progress: monthlyProgress,
-              caption: '過去30日分のHiveデータを集計',
-            ),
-            const SizedBox(height: 24),
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE7EBFF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.lightbulb_rounded,
-                        color: Color(0xFF4A63F4),
+                    Expanded(
+                      child: FocusStatCard(
+                        icon: Icons.calendar_today_rounded,
+                        title: '本日の合計',
+                        value: _formatDuration(focusStats.todayTotal),
+                        caption: 'Hiveに30秒間隔で自動保存',
+                        color: Colors.indigo.shade50,
+                        accentColor: const Color(0xFF4A63F4),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'フォーカス維持の仕様',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'README記載どおり、画面オン中は継続し、ホームに戻るとRiverpod経由で'
-                            'タイマーを停止しHiveへ確定保存します。'
-                            'Wake LockとAppLifecycleObserverで安全に運用できます。',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
+                      child: FocusStatCard(
+                        icon: Icons.timelapse_rounded,
+                        title: '現在のセッション',
+                        value: _formatDuration(timerState.sessionElapsed),
+                        caption: timerState.isRunning
+                            ? 'フォーカス中'
+                            : (timerState.hasActiveRecord ? '再開待機' : '停止中'),
+                        color: Colors.pink.shade50,
+                        accentColor: const Color(0xFFFF7B6B),
                       ),
                     ),
                   ],
                 ),
-              ),
+                const SizedBox(height: 24),
+                _GoalProgressTile(
+                  title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
+                  value:
+                      '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
+                  progress: weeklyProgress,
+                  caption: '過去7日間の記録を自動集計',
+                ),
+                const SizedBox(height: 12),
+                _GoalProgressTile(
+                  title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
+                  value:
+                      '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
+                  progress: monthlyProgress,
+                  caption: '過去30日分のHiveデータを集計',
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE7EBFF),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.lightbulb_rounded,
+                            color: Color(0xFF4A63F4),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                'フォーカス維持の仕様',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'README記載どおり、画面オン中は継続し、ホームに戻るとRiverpod経由で'
+                                'タイマーを停止しHiveへ確定保存します。'
+                                'Wake LockとAppLifecycleObserverで安全に運用できます。',
+                                style: TextStyle(
+                                  color: Colors.black54,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // タイマーが暗転モードの場合は真っ黒なオーバーレイのみを表示
+          if (timerState.isBlackScreenActive)
+            Positioned.fill(
+              child: _BlackScreenOverlay(onTap: _handleBlackScreenTap),
+            ),
+        ],
       ),
     );
   }
@@ -326,6 +335,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     } else {
       await notifier.startTimer();
     }
+  }
+
+  void _handleBlackScreenTap() {
+    ref.read(timerControllerProvider.notifier).exitBlackScreen();
   }
 
   Future<void> _resetTimer() =>
@@ -495,6 +508,40 @@ class _GoalProgressTile extends StatelessWidget {
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BlackScreenOverlay extends StatelessWidget {
+  const _BlackScreenOverlay({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        color: Colors.black,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.touch_app, color: Colors.white54, size: 48),
+              SizedBox(height: 12),
+              Text(
+                'タップして画面を表示',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -25,7 +25,10 @@ class TimerController extends StateNotifier<TimerState> {
   final WakeLockService wakeLock;
 
   Timer? _ticker;
+  Timer? _blackScreenTimer;
   bool _isHandlingLifecycleEvent = false;
+  // README仕様どおり「開始から5秒で暗転」を再現するディレイ
+  static const _blackScreenDelay = Duration(seconds: 5);
 
   Future<void> startTimer() async {
     if (state.isRunning) {
@@ -44,12 +47,14 @@ class TimerController extends StateNotifier<TimerState> {
       persistedDuration: activeRecord.duration,
       startedAt: activeRecord.startedAt,
       activeRecordId: activeRecord.id,
+      isBlackScreenActive: false,
     );
 
     await wakeLock.enable();
 
     _ticker?.cancel();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _onTick());
+    _scheduleBlackScreenOverlay();
   }
 
   Future<void> stopTimer() async {
@@ -58,6 +63,7 @@ class TimerController extends StateNotifier<TimerState> {
     }
 
     _ticker?.cancel();
+    _cancelBlackScreenOverlay();
 
     final recordId = state.activeRecordId!;
     final elapsed = state.sessionElapsed;
@@ -75,6 +81,7 @@ class TimerController extends StateNotifier<TimerState> {
 
   Future<void> resetTimer() async {
     _ticker?.cancel();
+    _cancelBlackScreenOverlay();
 
     if (state.hasActiveRecord) {
       await storage.deleteRecord(state.activeRecordId!);
@@ -101,6 +108,19 @@ class TimerController extends StateNotifier<TimerState> {
       await stopTimer();
     } finally {
       _isHandlingLifecycleEvent = false;
+    }
+  }
+
+  /// ユーザーのタップで黒画面を解除し、再び5秒カウントを開始する
+  void exitBlackScreen() {
+    if (!state.isBlackScreenActive) {
+      return;
+    }
+
+    state = state.copyWith(isBlackScreenActive: false);
+
+    if (state.isRunning) {
+      _scheduleBlackScreenOverlay();
     }
   }
 
@@ -133,12 +153,32 @@ class TimerController extends StateNotifier<TimerState> {
       persistedDuration: activeRecord.duration,
       startedAt: activeRecord.startedAt,
       activeRecordId: activeRecord.id,
+      isBlackScreenActive: false,
     );
+  }
+
+  // タイマー継続中は5秒おきに暗転オーバーレイを表示する
+  void _scheduleBlackScreenOverlay() {
+    _blackScreenTimer?.cancel();
+    _blackScreenTimer = Timer(_blackScreenDelay, () {
+      if (!state.isRunning) {
+        return;
+      }
+
+      // 黒画面表示中もタイマーは走り続けるため状態だけを切り替える
+      state = state.copyWith(isBlackScreenActive: true);
+    });
+  }
+
+  void _cancelBlackScreenOverlay() {
+    _blackScreenTimer?.cancel();
+    _blackScreenTimer = null;
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _cancelBlackScreenOverlay();
     super.dispose();
   }
 }

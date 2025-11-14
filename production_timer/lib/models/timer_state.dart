@@ -5,6 +5,7 @@ class TimerState {
     required this.persistedDuration,
     required this.startedAt,
     required this.activeRecordId,
+    required this.isBlackScreenActive,
   });
 
   final bool isRunning;
@@ -12,6 +13,7 @@ class TimerState {
   final Duration persistedDuration;
   final DateTime? startedAt;
   final String? activeRecordId;
+  final bool isBlackScreenActive;
 
   factory TimerState.initial() => const TimerState(
     isRunning: false,
@@ -19,6 +21,7 @@ class TimerState {
     persistedDuration: Duration.zero,
     startedAt: null,
     activeRecordId: null,
+    isBlackScreenActive: false,
   );
 
   bool get hasActiveRecord => activeRecordId != null;
@@ -29,6 +32,7 @@ class TimerState {
     Duration? persistedDuration,
     DateTime? startedAt,
     String? activeRecordId,
+    bool? isBlackScreenActive,
     bool clearActiveRecord = false,
   }) {
     return TimerState(
@@ -39,6 +43,7 @@ class TimerState {
       activeRecordId: clearActiveRecord
           ? null
           : activeRecordId ?? this.activeRecordId,
+      isBlackScreenActive: isBlackScreenActive ?? this.isBlackScreenActive,
     );
   }
 
@@ -48,5 +53,6 @@ class TimerState {
     persistedDuration: Duration.zero,
     startedAt: null,
     activeRecordId: null,
+    isBlackScreenActive: false,
   );
 }
