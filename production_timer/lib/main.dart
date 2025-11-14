@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-// import 'package:production_timer/services/time_storage_service.dart';
+import 'package:production_timer/services/time_storage_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -87,6 +87,9 @@ class _TimerPageState extends State<TimerPage> {
   // Timerオブジェクトを保存する変数
   Timer? _timer;
 
+  // TimeStorageServiceのインスタンス
+  final TimeStorageService _storageService = TimeStorageService();
+
   // 今日の0時（深夜）の日時を取得する関数
   DateTime _getTodayMidnight() {
     final now = DateTime.now();
@@ -101,17 +104,22 @@ class _TimerPageState extends State<TimerPage> {
   }
 
   // タイマーをスタート/ストップする関数
-  void _toggleTimer() {
-    setState(() {
-      if (_isRunning) {
-        // タイマーが動いている場合は停止
-        _timer?.cancel();
+  void _toggleTimer() async {
+    if (_isRunning) {
+      // タイマーが動いている場合は停止
+      _timer?.cancel();
+      setState(() {
         _isRunning = false;
-      } else {
-        // タイマーが停止している場合は開始
+      });
+    } else {
+      // タイマーが停止している場合は開始
+      // 今日の保存済み秒数を取得
+      final todayRecord = await _storageService.getTodayRecord();
+
+      setState(() {
         _isRunning = true;
-        // 0秒から開始
-        _seconds = 0;
+        // 保存済み秒数がある場合はその秒数から開始、なければ0から開始
+        _seconds = todayRecord?.totalSeconds ?? 0;
 
         _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
           setState(() {
@@ -119,8 +127,8 @@ class _TimerPageState extends State<TimerPage> {
             _seconds++;
           });
         });
-      }
-    });
+      });
+    }
   }
 
   // 秒数を「HH:MM:SS」形式の文字列に変換する関数
