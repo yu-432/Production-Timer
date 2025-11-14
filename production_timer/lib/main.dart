@@ -1,8 +1,57 @@
 import 'package:flutter/material.dart';
+// import 'package:production_timer/services/time_storage_service.dart';
 
 void main() {
   runApp(const MyApp());
 }
+
+/*
+ * ==========================================
+ * TimeStorageService の使用例
+ * ==========================================
+ *
+ * 1. 時間記録を保存する
+ * ```dart
+ * final service = TimeStorageService();
+ * await service.saveTimeRecord(3600); // 1時間（3600秒）を保存
+ * ```
+ *
+ * 2. 今日の記録を取得する
+ * ```dart
+ * final todayRecord = await service.getTodayRecord();
+ * if (todayRecord != null) {
+ *   print('今日の稼働時間: ${todayRecord.getFormattedTime()}');
+ *   print('日付: ${todayRecord.date}');
+ *   print('曜日: ${todayRecord.dayOfWeek}');
+ * }
+ * ```
+ *
+ * 3. 全ての記録を取得する
+ * ```dart
+ * final allRecords = await service.getAllTimeRecords();
+ * for (var record in allRecords) {
+ *   print('${record.date} (${record.dayOfWeek}): ${record.getFormattedTime()}');
+ * }
+ * ```
+ *
+ * 4. 累計稼働時間を取得する
+ * ```dart
+ * final totalSeconds = await service.getTotalSeconds();
+ * print('全期間の累計: ${totalSeconds}秒');
+ * ```
+ *
+ * 5. タイマーで計測した時間を保存する例
+ * ```dart
+ * // タイマー実装例
+ * int elapsedSeconds = 0;
+ * Timer.periodic(Duration(seconds: 1), (timer) {
+ *   elapsedSeconds++;
+ * });
+ *
+ * // タイマー停止時に保存
+ * await service.saveTimeRecord(elapsedSeconds);
+ * ```
+ */
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
