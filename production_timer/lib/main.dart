@@ -7,6 +7,7 @@ import 'providers/focus_stats_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/storage_provider.dart';
 import 'providers/timer_controller.dart';
+import 'screens/settings_screen.dart';
 import 'services/storage_service.dart';
 
 Future<void> main() async {
@@ -80,6 +81,13 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         title: const Text('Production Timer'),
         centerTitle: false,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: '設定',
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_rounded),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -347,6 +355,18 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
 
   void _handleBlackScreenTap() {
     ref.read(timerControllerProvider.notifier).exitBlackScreen();
+  }
+
+  Future<void> _openSettings() async {
+    final saved = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+    );
+    if (!mounted || saved != true) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('目標設定を更新しました')),
+    );
   }
 
   Future<void> _resetTimer() =>
