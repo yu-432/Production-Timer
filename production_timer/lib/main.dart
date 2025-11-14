@@ -1,9 +1,23 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
-  runApp(const ProductionTimerApp());
+import 'models/timer_state.dart';
+import 'providers/focus_stats_provider.dart';
+import 'providers/settings_provider.dart';
+import 'providers/storage_provider.dart';
+import 'providers/timer_controller.dart';
+import 'services/storage_service.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final storage = await StorageService.initialize();
+
+  runApp(
+    ProviderScope(
+      overrides: [storageServiceProvider.overrideWithValue(storage)],
+      child: const ProductionTimerApp(),
+    ),
+  );
 }
 
 class ProductionTimerApp extends StatelessWidget {
@@ -30,88 +44,59 @@ class ProductionTimerApp extends StatelessWidget {
   }
 }
 
-class TimerScreen extends StatefulWidget {
+class TimerScreen extends ConsumerStatefulWidget {
   const TimerScreen({super.key});
 
   @override
-  State<TimerScreen> createState() => _TimerScreenState();
+  ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends State<TimerScreen> {
-  static const double _weeklyGoalHours = 40;
-  static const double _monthlyGoalHours = 160;
-
-  final Duration _baseTodayFocus = const Duration(hours: 1, minutes: 45);
-  final double _baseWeeklyHours = 12.5;
-  final double _baseMonthlyHours = 55;
-
-  Duration _sessionElapsed = Duration.zero;
-  Timer? _ticker;
-  bool _isRunning = false;
-
-  Duration get _todayTotal => _baseTodayFocus + _sessionElapsed;
-  double get _weeklyHours =>
-      _baseWeeklyHours + _todayTotal.inMinutes / Duration.minutesPerHour;
-  double get _monthlyHours =>
-      _baseMonthlyHours + _todayTotal.inMinutes / Duration.minutesPerHour;
-  double get _weeklyProgress =>
-      (_weeklyHours / _weeklyGoalHours).clamp(0.0, 1.0);
-  double get _monthlyProgress =>
-      (_monthlyHours / _monthlyGoalHours).clamp(0.0, 1.0);
+class _TimerScreenState extends ConsumerState<TimerScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void dispose() {
-    _ticker?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  void _toggleTimer() {
-    if (_isRunning) {
-      _stopTimer();
-    } else {
-      _startTimer();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      final timerState = ref.read(timerControllerProvider);
+      if (timerState.isRunning) {
+        ref.read(timerControllerProvider.notifier).stopTimer();
+      }
     }
-  }
-
-  void _startTimer() {
-    setState(() => _isRunning = true);
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _sessionElapsed += const Duration(seconds: 1);
-      });
-    });
-  }
-
-  void _stopTimer() {
-    _ticker?.cancel();
-    setState(() => _isRunning = false);
-  }
-
-  void _resetTimer() {
-    _ticker?.cancel();
-    setState(() {
-      _isRunning = false;
-      _sessionElapsed = Duration.zero;
-    });
-  }
-
-  String _formatDuration(Duration duration) {
-    final hours = duration.inHours.toString().padLeft(2, '0');
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$hours:$minutes:$seconds';
-  }
-
-  String _formatTodayLabel() {
-    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-    final now = DateTime.now();
-    final weekday = weekdays[now.weekday % 7];
-    return '${now.month}月${now.day}日 ($weekday)';
+    super.didChangeAppLifecycleState(state);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final timerState = ref.watch(timerControllerProvider);
+    final focusStats = ref.watch(focusStatsProvider);
+    final settings = ref.watch(appSettingsProvider);
+
+    final weeklyGoalHours = settings.weeklyGoalMinutes / 60;
+    final monthlyGoalHours = settings.monthlyGoalMinutes / 60;
+
+    final weeklyProgress = _progress(
+      focusStats.weeklyHours,
+      weeklyGoalHours.toDouble(),
+    );
+    final monthlyProgress = _progress(
+      focusStats.monthlyHours,
+      monthlyGoalHours.toDouble(),
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Production Timer'),
@@ -123,15 +108,15 @@ class _TimerScreenState extends State<TimerScreen> {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
             Text(
-              'デスクワークの実稼働時間を秒単位で記録します。',
+              'デスクワークの実稼働時間をRiverpod経由で管理し、Hiveに自動保存します。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Colors.black54,
               ),
             ),
             const SizedBox(height: 16),
-            _buildTimerCard(theme),
+            _buildTimerCard(theme, timerState),
             const SizedBox(height: 16),
-            _buildControls(theme),
+            _buildControls(theme, timerState),
             const SizedBox(height: 28),
             Text(
               '今日の記録',
@@ -146,8 +131,8 @@ class _TimerScreenState extends State<TimerScreen> {
                   child: FocusStatCard(
                     icon: Icons.calendar_today_rounded,
                     title: '本日の合計',
-                    value: _formatDuration(_todayTotal),
-                    caption: '自動保存の対象',
+                    value: _formatDuration(focusStats.todayTotal),
+                    caption: 'Hiveに30秒間隔で自動保存',
                     color: Colors.indigo.shade50,
                     accentColor: const Color(0xFF4A63F4),
                   ),
@@ -157,8 +142,10 @@ class _TimerScreenState extends State<TimerScreen> {
                   child: FocusStatCard(
                     icon: Icons.timelapse_rounded,
                     title: '現在のセッション',
-                    value: _formatDuration(_sessionElapsed),
-                    caption: _isRunning ? 'フォーカス中' : '停止中',
+                    value: _formatDuration(timerState.sessionElapsed),
+                    caption: timerState.isRunning
+                        ? 'フォーカス中'
+                        : (timerState.hasActiveRecord ? '再開待機' : '停止中'),
                     color: Colors.pink.shade50,
                     accentColor: const Color(0xFFFF7B6B),
                   ),
@@ -167,19 +154,19 @@ class _TimerScreenState extends State<TimerScreen> {
             ),
             const SizedBox(height: 24),
             _GoalProgressTile(
-              title: '週間目標 ${_weeklyGoalHours.toStringAsFixed(0)}h',
+              title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
               value:
-                  '${_weeklyHours.toStringAsFixed(1)}h / ${_weeklyGoalHours.toStringAsFixed(0)}h',
-              progress: _weeklyProgress,
-              caption: '日曜日開始、README準拠の進捗表示',
+                  '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
+              progress: weeklyProgress,
+              caption: '過去7日間の記録を自動集計',
             ),
             const SizedBox(height: 12),
             _GoalProgressTile(
-              title: '月間目標 ${_monthlyGoalHours.toStringAsFixed(0)}h',
+              title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
               value:
-                  '${_monthlyHours.toStringAsFixed(1)}h / ${_monthlyGoalHours.toStringAsFixed(0)}h',
-              progress: _monthlyProgress,
-              caption: '過去30日を集計した目標との差分',
+                  '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
+              progress: monthlyProgress,
+              caption: '過去30日分のHiveデータを集計',
             ),
             const SizedBox(height: 24),
             Card(
@@ -218,9 +205,9 @@ class _TimerScreenState extends State<TimerScreen> {
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'READMEに記載の通り、画面オンのままなら継続、ホームに戻る・'
-                            '別アプリを開いた時点で自動停止します。'
-                            'Wake Lockでスリープを防ぎつつ安全に記録できます。',
+                            'README記載どおり、画面オン中は継続し、ホームに戻るとRiverpod経由で'
+                            'タイマーを停止しHiveへ確定保存します。'
+                            'Wake LockとAppLifecycleObserverで安全に運用できます。',
                             style: TextStyle(
                               color: Colors.black54,
                               height: 1.4,
@@ -239,7 +226,7 @@ class _TimerScreenState extends State<TimerScreen> {
     );
   }
 
-  Widget _buildTimerCard(ThemeData theme) {
+  Widget _buildTimerCard(ThemeData theme, TimerState timerState) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
@@ -266,7 +253,7 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            _isRunning ? '集中セッション中' : '開始を待機中',
+            timerState.isRunning ? '集中セッション中' : '開始を待機中',
             style: theme.textTheme.titleMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -274,7 +261,7 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
           const SizedBox(height: 28),
           Text(
-            _formatDuration(_sessionElapsed),
+            _formatDuration(timerState.sessionElapsed),
             style: theme.textTheme.displaySmall?.copyWith(
               color: Colors.white,
               fontSize: 54,
@@ -283,7 +270,7 @@ class _TimerScreenState extends State<TimerScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '秒単位でリアルタイム更新',
+            '秒単位でリアルタイム更新 (Riverpod)',
             style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
           const SizedBox(height: 28),
@@ -303,14 +290,18 @@ class _TimerScreenState extends State<TimerScreen> {
     );
   }
 
-  Widget _buildControls(ThemeData theme) {
+  Widget _buildControls(ThemeData theme, TimerState timerState) {
     return Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _sessionElapsed == Duration.zero
-                ? null
-                : () => _resetTimer(),
+            onPressed:
+                timerState.sessionElapsed == Duration.zero &&
+                        !timerState.hasActiveRecord
+                    ? null
+                    : () {
+                        _resetTimer();
+                      },
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('リセット'),
             style: OutlinedButton.styleFrom(
@@ -323,14 +314,18 @@ class _TimerScreenState extends State<TimerScreen> {
         Expanded(
           flex: 2,
           child: FilledButton.icon(
-            onPressed: _toggleTimer,
+            onPressed: () {
+              _toggleTimer();
+            },
             icon: Icon(
-              _isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+              timerState.isRunning
+                  ? Icons.stop_rounded
+                  : Icons.play_arrow_rounded,
             ),
-            label: Text(_isRunning ? '停止' : '開始'),
+            label: Text(timerState.isRunning ? '停止' : '開始'),
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 20),
-              backgroundColor: _isRunning
+              backgroundColor: timerState.isRunning
                   ? const Color(0xFFFF7B6B)
                   : theme.colorScheme.primary,
               foregroundColor: Colors.white,
@@ -344,6 +339,40 @@ class _TimerScreenState extends State<TimerScreen> {
       ],
     );
   }
+
+  Future<void> _toggleTimer() async {
+    final notifier = ref.read(timerControllerProvider.notifier);
+    final timerState = ref.read(timerControllerProvider);
+    if (timerState.isRunning) {
+      await notifier.stopTimer();
+    } else {
+      await notifier.startTimer();
+    }
+  }
+
+  Future<void> _resetTimer() =>
+      ref.read(timerControllerProvider.notifier).resetTimer();
+
+  static double _progress(double value, double goal) {
+    if (goal <= 0) {
+      return 0;
+    }
+    return (value / goal).clamp(0.0, 1.0);
+  }
+}
+
+String _formatDuration(Duration duration) {
+  final hours = duration.inHours.toString().padLeft(2, '0');
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$hours:$minutes:$seconds';
+}
+
+String _formatTodayLabel() {
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  final now = DateTime.now();
+  final weekday = weekdays[now.weekday % 7];
+  return '${now.month}月${now.day}日 ($weekday)';
 }
 
 class FocusStatCard extends StatelessWidget {
