@@ -61,20 +61,13 @@ class _TimerPageState extends State<TimerPage> {
       } else {
         // タイマーが停止している場合は開始
         _isRunning = true;
-        // 現在の時刻から今日の0時からの経過秒数を取得
-        _seconds = _getSecondsFromMidnight();
+        // 0秒から開始
+        _seconds = 0;
 
         _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
           setState(() {
-            // 現在時刻を再計算して、24時を超えたらリセット
-            final currentSeconds = _getSecondsFromMidnight();
-
-            // 日付が変わった場合（currentSecondsが_secondsより小さくなる）
-            if (currentSeconds < _seconds) {
-              _seconds = currentSeconds;
-            } else {
-              _seconds = currentSeconds;
-            }
+            // 1秒ずつカウントアップ
+            _seconds++;
           });
         });
       }
