@@ -204,10 +204,18 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             ),
           ),
           // タイマーが暗転モードの場合は真っ黒なオーバーレイのみを表示
-          if (timerState.isBlackScreenActive)
-            Positioned.fill(
-              child: _BlackScreenOverlay(onTap: _handleBlackScreenTap),
+          Positioned.fill(
+            child: AnimatedOpacity(
+              // 黒画面を一瞬で切り替えず、徐々に暗転させて驚きを軽減する。
+              duration: const Duration(milliseconds: 350),
+              curve: Curves.easeOut,
+              opacity: timerState.isBlackScreenActive ? 1 : 0,
+              child: IgnorePointer(
+                ignoring: !timerState.isBlackScreenActive,
+                child: _BlackScreenOverlay(onTap: _handleBlackScreenTap),
+              ),
             ),
+          ),
         ],
       ),
     );
