@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/settings_provider.dart';
 
+/// 週間・月間目標時間を設定する画面
+///
+/// ユーザーが目標時間を入力・保存できます。
+/// Hiveには分単位で保存されますが、画面では時間単位で表示・入力します。
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -12,16 +16,21 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _weeklyController;
-  late final TextEditingController _monthlyController;
-  bool _isSaving = false;
+  final _formKey = GlobalKey<FormState>(); // フォームのバリデーション用
+  late final TextEditingController _weeklyController; // 週間目標の入力欄
+  late final TextEditingController _monthlyController; // 月間目標の入力欄
+  bool _isSaving = false; // 保存中かどうか
 
+  /// 画面の初期化
+  ///
+  /// 現在の設定値を読み込んで、入力欄に表示します。
+  /// Hiveには分単位で保存されているので、時間単位に変換します。
   @override
   void initState() {
     super.initState();
     final settings = ref.read(appSettingsProvider);
-    // Hiveには分単位で保持しているので、画面では時間単位に揃えて表示する。
+
+    // 分単位を時間単位に変換して入力欄に設定
     _weeklyController = TextEditingController(
       text: _minutesToHours(settings.weeklyGoalMinutes).toString(),
     );
@@ -30,6 +39,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// 画面破棄時のクリーンアップ
+  ///
+  /// メモリリークを防ぐため、コントローラーを破棄します。
   @override
   void dispose() {
     _weeklyController.dispose();
@@ -111,53 +123,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// 入力値の範囲をチェックする
+  ///
+  /// 数字以外が入力されていたり、範囲外の値の場合はエラーメッセージを返します。
+  /// 問題なければnullを返します。
   String? _validateRange({
     required String? value,
     required int min,
     required int max,
   }) {
+    // 数字に変換できるかチェック
     final parsed = int.tryParse(value ?? '');
     if (parsed == null) {
       return '数字で入力してください';
     }
+    // 範囲内かチェック
     if (parsed < min || parsed > max) {
       return '$min〜$maxの範囲で入力してください';
     }
-    return null;
+    return null; // バリデーションOK
   }
 
+  /// 保存ボタンが押された時の処理
+  ///
+  /// 処理の流れ:
+  /// 1. バリデーションチェック
+  /// 2. 保存中状態に変更(ボタンを無効化)
+  /// 3. 時間単位の入力値を分単位に変換
+  /// 4. Hiveに保存
+  /// 5. 画面を閉じて、成功を示すtrueを返す
   Future<void> _handleSave() async {
+    // バリデーションエラーがあれば何もしない
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
+    // 保存中フラグをON(ボタンが無効化される)
     setState(() => _isSaving = true);
+
+    // 設定を更新するNotifierを取得
     final notifier = ref.read(appSettingsProvider.notifier);
+
+    // 入力値を時間単位の整数に変換
     final weeklyHours = int.parse(_weeklyController.text);
     final monthlyHours = int.parse(_monthlyController.text);
 
-    // Hive保存時に再び分単位へ変換して永続化する。
+    // 時間単位から分単位に変換してHiveに保存
     await notifier.updateGoals(
       weeklyGoalMinutes: weeklyHours * 60,
       monthlyGoalMinutes: monthlyHours * 60,
     );
 
+    // 画面が既に閉じられている場合は何もしない
     if (!mounted) {
       return;
     }
 
+    // 保存中フラグをOFF
     setState(() => _isSaving = false);
+
+    // 画面を閉じて、成功を示すtrueを返す(呼び出し元で成功メッセージを表示)
     Navigator.of(context).pop(true);
   }
 
+  /// 分単位を時間単位に変換
+  ///
+  /// 整数除算(~/)を使って、端数を切り捨てます。
   int _minutesToHours(int minutes) => minutes ~/ 60;
 }
 
+/// 数字入力欄のウィジェット
+///
+/// 週間目標と月間目標で同じデザインの入力欄を使うため、
+/// 共通化しています。
 class _NumberField extends StatelessWidget {
   const _NumberField({
-    required this.controller,
-    required this.label,
-    required this.helper,
-    required this.validator,
+    required this.controller, // 入力値を管理するコントローラー
+    required this.label, // ラベル(例: "週間目標 (時間)")
+    required this.helper, // ヘルプテキスト(例: "1〜168時間のあいだで...")
+    required this.validator, // バリデーション関数
   });
 
   final TextEditingController controller;
@@ -167,7 +211,6 @@ class _NumberField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 同じ見た目の入力欄を量産せずに済むよう共有化。
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(
@@ -175,9 +218,9 @@ class _NumberField extends StatelessWidget {
         helperText: helper,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
       ),
-      keyboardType: TextInputType.number,
-      validator: validator,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      keyboardType: TextInputType.number, // 数字キーボードを表示
+      validator: validator, // バリデーション関数を設定
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly], // 数字のみ入力可能
     );
   }
 }

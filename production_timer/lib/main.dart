@@ -10,10 +10,21 @@ import 'providers/timer_controller.dart';
 import 'screens/settings_screen.dart';
 import 'services/storage_service.dart';
 
+/// アプリのエントリーポイント
+///
+/// 処理の流れ:
+/// 1. Flutterのバインディングを初期化
+/// 2. Hiveデータベースを初期化して、過去のタイマー記録を読み込み
+/// 3. Riverpodで状態管理を行うProviderScopeでアプリを起動
 Future<void> main() async {
+  // Flutterのウィジェットシステムを初期化(非同期処理の前に必須)
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Hiveデータベースを初期化し、過去のタイマー記録と設定を読み込み
   final storage = await StorageService.initialize();
 
+  // アプリ全体をRiverpodのProviderScopeで包み、状態管理を有効化
+  // storageServiceProviderに実際のStorageServiceインスタンスを注入
   runApp(
     ProviderScope(
       overrides: [storageServiceProvider.overrideWithValue(storage)],
@@ -22,21 +33,32 @@ Future<void> main() async {
   );
 }
 
+/// アプリ全体のルートウィジェット
+///
+/// MaterialAppの設定とテーマを定義します。
+/// ConsumerWidgetを使うことで、Riverpodの状態を監視できます。
 class ProductionTimerApp extends ConsumerWidget {
   const ProductionTimerApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Ensure the app-wide lifecycle observer is registered once.
+    // アプリのライフサイクル(バックグラウンド移行など)を監視するプロバイダーを有効化
+    // これにより、アプリが裏に回った時にタイマーを自動停止できます
     ref.watch(appLifecycleProvider);
 
+    // アプリ全体の基本カラー(紫がかった青)
     const seedColor = Color(0xFF5F6AF3);
+
     return MaterialApp(
       title: 'Production Timer',
       theme: ThemeData(
+        // Material Design 3を使用
         useMaterial3: true,
+        // 基本カラーから自動的に色のバリエーションを生成
         colorScheme: ColorScheme.fromSeed(seedColor: seedColor),
+        // 背景色を薄い青紫に設定
         scaffoldBackgroundColor: const Color(0xFFF5F6FB),
+        // タイマー表示などで使うテキストスタイルをカスタマイズ
         textTheme: const TextTheme(
           displaySmall: TextStyle(
             fontWeight: FontWeight.w600,
@@ -44,11 +66,17 @@ class ProductionTimerApp extends ConsumerWidget {
           ),
         ),
       ),
+      // 最初に表示する画面をタイマー画面に設定
       home: const TimerScreen(),
     );
   }
 }
 
+/// メインのタイマー画面
+///
+/// タイマーの開始/停止、経過時間の表示、週間・月間の目標進捗を表示します。
+/// ConsumerStatefulWidgetを使うことで、Riverpodの状態を監視しながら
+/// 画面の状態も持つことができます。
 class TimerScreen extends ConsumerStatefulWidget {
   const TimerScreen({super.key});
 
@@ -59,17 +87,22 @@ class TimerScreen extends ConsumerStatefulWidget {
 class _TimerScreenState extends ConsumerState<TimerScreen> {
   @override
   Widget build(BuildContext context) {
+    // 現在のテーマ設定を取得(色やフォントなどの情報)
     final theme = Theme.of(context);
-    final timerState = ref.watch(timerControllerProvider);
-    final focusStats = ref.watch(focusStatsProvider);
-    final settings = ref.watch(appSettingsProvider);
 
+    // Riverpodから各種状態を取得
+    final timerState = ref.watch(timerControllerProvider); // タイマーの状態(実行中かどうか、経過時間など)
+    final focusStats = ref.watch(focusStatsProvider); // 統計情報(今日の合計、週間・月間の合計)
+    final settings = ref.watch(appSettingsProvider); // ユーザー設定(週間・月間の目標時間)
+
+    // 設定から目標時間を取得(Hiveには分単位で保存されているので、時間に変換)
     final weeklyGoalHours = settings.weeklyGoalMinutes / 60;
     final monthlyGoalHours = settings.monthlyGoalMinutes / 60;
 
+    // 現在の進捗率を計算(0.0〜1.0の範囲)
     final weeklyProgress = _progress(
-      focusStats.weeklyHours,
-      weeklyGoalHours.toDouble(),
+      focusStats.weeklyHours, // 実際の作業時間
+      weeklyGoalHours.toDouble(), // 目標時間
     );
     final monthlyProgress = _progress(
       focusStats.monthlyHours,
@@ -172,6 +205,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     );
   }
 
+  /// タイマー表示カードを構築
+  ///
+  /// グラデーション背景の大きなカードに、現在のセッション時間を表示します。
+  /// タイマーが動いているかどうかで表示テキストが変わります。
   Widget _buildTimerCard(ThemeData theme, TimerState timerState) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -220,6 +257,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     );
   }
 
+  /// コントロールボタン(リセット・開始/停止)を構築
+  ///
+  /// 左側にリセットボタン、右側に開始/停止ボタンを配置します。
+  /// タイマーの状態によってボタンの色やアイコンが変わります。
   Widget _buildControls(ThemeData theme, TimerState timerState) {
     return Row(
       children: [
@@ -270,35 +311,54 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     );
   }
 
+  /// タイマーの開始/停止を切り替え
+  ///
+  /// 現在の状態を見て、動いていれば停止、停止していれば開始します。
   Future<void> _toggleTimer() async {
     final notifier = ref.read(timerControllerProvider.notifier);
     final timerState = ref.read(timerControllerProvider);
     if (timerState.isRunning) {
-      await notifier.stopTimer();
+      await notifier.stopTimer(); // 実行中なら停止
     } else {
-      await notifier.startTimer();
+      await notifier.startTimer(); // 停止中なら開始
     }
   }
 
+  /// 黒画面をタップした時の処理
+  ///
+  /// 黒画面を解除して、タイマー画面に戻します。
+  /// 5秒後にまた黒画面になります。
   void _handleBlackScreenTap() {
     ref.read(timerControllerProvider.notifier).exitBlackScreen();
   }
 
+  /// 設定画面を開く
+  ///
+  /// 設定画面で保存ボタンを押すと、trueが返ってきて成功メッセージを表示します。
   Future<void> _openSettings() async {
     final saved = await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsScreen()),
     );
+    // 画面が既に閉じられている、または保存していない場合は何もしない
     if (!mounted || saved != true) {
       return;
     }
+    // 保存成功メッセージを表示
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('目標設定を更新しました')),
     );
   }
 
+  /// タイマーをリセット
+  ///
+  /// 現在のセッションを削除して、時間を0に戻します。
   Future<void> _resetTimer() =>
       ref.read(timerControllerProvider.notifier).resetTimer();
 
+  /// 進捗率を計算(0.0〜1.0)
+  ///
+  /// 目標が0以下の場合は0を返します。
+  /// 実際の値が目標を超えても、1.0を超えないようにclampで制限します。
   static double _progress(double value, double goal) {
     if (goal <= 0) {
       return 0;
@@ -307,6 +367,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   }
 }
 
+/// 経過時間を「HH:MM:SS」形式の文字列に変換
+///
+/// 例: 3665秒 → "01:01:05"
+/// padLeftで2桁にゼロ埋めして見やすく表示します。
 String _formatDuration(Duration duration) {
   final hours = duration.inHours.toString().padLeft(2, '0');
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -314,6 +378,10 @@ String _formatDuration(Duration duration) {
   return '$hours:$minutes:$seconds';
 }
 
+/// 今日の日付を日本語形式で取得
+///
+/// 例: "1月15日 (月)"
+/// weekdayは日曜が7なので、%7で日曜を0に変換します。
 String _formatTodayLabel() {
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   final now = DateTime.now();
@@ -321,15 +389,19 @@ String _formatTodayLabel() {
   return '${now.month}月${now.day}日 ($weekday)';
 }
 
+/// 統計情報を表示するカード
+///
+/// 「本日の合計」や「現在のセッション」などの情報を
+/// アイコン付きのカードで見やすく表示します。
 class FocusStatCard extends StatelessWidget {
   const FocusStatCard({
     super.key,
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.caption,
-    required this.color,
-    required this.accentColor,
+    required this.icon, // カードに表示するアイコン
+    required this.title, // カードのタイトル(例: "本日の合計")
+    required this.value, // 表示する値(例: "01:23:45")
+    required this.caption, // 補足説明(例: "自動保存されます")
+    required this.color, // カードの背景色
+    required this.accentColor, // アイコンの色
   });
 
   final IconData icon;
@@ -408,12 +480,15 @@ class _InfoPill extends StatelessWidget {
   }
 }
 
+/// 目標進捗を表示するタイル
+///
+/// 週間目標や月間目標の達成度をプログレスバーで表示します。
 class _GoalProgressTile extends StatelessWidget {
   const _GoalProgressTile({
-    required this.title,
-    required this.value,
-    required this.progress,
-    required this.caption,
+    required this.title, // タイトル(例: "週間目標 40h")
+    required this.value, // 進捗状況(例: "12.5h / 40h")
+    required this.progress, // 進捗率(0.0〜1.0)
+    required this.caption, // 補足説明(例: "過去7日間")
   });
 
   final String title;
@@ -469,10 +544,14 @@ class _GoalProgressTile extends StatelessWidget {
   }
 }
 
+/// 黒画面オーバーレイ
+///
+/// タイマー実行中に5秒経過すると表示される真っ黒な画面です。
+/// タップすると元の画面に戻ります(5秒後にまた黒画面になります)。
 class _BlackScreenOverlay extends StatelessWidget {
   const _BlackScreenOverlay({required this.onTap});
 
-  final VoidCallback onTap;
+  final VoidCallback onTap; // タップされた時に呼ばれる関数
 
   @override
   Widget build(BuildContext context) {
