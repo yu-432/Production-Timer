@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/timer_state.dart';
+import 'providers/app_lifecycle_provider.dart';
 import 'providers/focus_stats_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/storage_provider.dart';
@@ -20,11 +21,14 @@ Future<void> main() async {
   );
 }
 
-class ProductionTimerApp extends StatelessWidget {
+class ProductionTimerApp extends ConsumerWidget {
   const ProductionTimerApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Ensure the app-wide lifecycle observer is registered once.
+    ref.watch(appLifecycleProvider);
+
     const seedColor = Color(0xFF5F6AF3);
     return MaterialApp(
       title: 'Production Timer',
@@ -51,33 +55,7 @@ class TimerScreen extends ConsumerStatefulWidget {
   ConsumerState<TimerScreen> createState() => _TimerScreenState();
 }
 
-class _TimerScreenState extends ConsumerState<TimerScreen>
-    with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      final timerState = ref.read(timerControllerProvider);
-      if (timerState.isRunning) {
-        ref.read(timerControllerProvider.notifier).stopTimer();
-      }
-    }
-    super.didChangeAppLifecycleState(state);
-  }
-
+class _TimerScreenState extends ConsumerState<TimerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -297,11 +275,11 @@ class _TimerScreenState extends ConsumerState<TimerScreen>
           child: OutlinedButton.icon(
             onPressed:
                 timerState.sessionElapsed == Duration.zero &&
-                        !timerState.hasActiveRecord
-                    ? null
-                    : () {
-                        _resetTimer();
-                      },
+                    !timerState.hasActiveRecord
+                ? null
+                : () {
+                    _resetTimer();
+                  },
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('リセット'),
             style: OutlinedButton.styleFrom(

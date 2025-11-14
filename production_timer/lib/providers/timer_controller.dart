@@ -25,6 +25,7 @@ class TimerController extends StateNotifier<TimerState> {
   final WakeLockService wakeLock;
 
   Timer? _ticker;
+  bool _isHandlingLifecycleEvent = false;
 
   Future<void> startTimer() async {
     if (state.isRunning) {
@@ -88,6 +89,19 @@ class TimerController extends StateNotifier<TimerState> {
     final nextElapsed = state.sessionElapsed + const Duration(seconds: 1);
     state = state.copyWith(sessionElapsed: nextElapsed);
     unawaited(_persistProgress(nextElapsed));
+  }
+
+  Future<void> handleAppBackgroundEvent() async {
+    if (_isHandlingLifecycleEvent || !state.isRunning) {
+      return;
+    }
+
+    _isHandlingLifecycleEvent = true;
+    try {
+      await stopTimer();
+    } finally {
+      _isHandlingLifecycleEvent = false;
+    }
   }
 
   Future<void> _persistProgress(Duration elapsed) async {
