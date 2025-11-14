@@ -95,13 +95,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                Text(
-                  'デスクワークの実稼働時間をRiverpod経由で管理し、Hiveに自動保存します。',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 16),
+                // ユーザ向けの説明は不要なため削除
                 _buildTimerCard(theme, timerState),
                 const SizedBox(height: 16),
                 _buildControls(theme, timerState),
@@ -120,7 +114,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                         icon: Icons.calendar_today_rounded,
                         title: '本日の合計',
                         value: _formatDuration(focusStats.todayTotal),
-                        caption: 'Hiveに30秒間隔で自動保存',
+                        caption: '自動保存されます', // 技術詳細を削除してシンプルに
                         color: Colors.indigo.shade50,
                         accentColor: const Color(0xFF4A63F4),
                       ),
@@ -146,7 +140,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                   value:
                       '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
                   progress: weeklyProgress,
-                  caption: '過去7日間の記録を自動集計',
+                  caption: '過去7日間', // シンプルな表現に変更
                 ),
                 const SizedBox(height: 12),
                 _GoalProgressTile(
@@ -154,60 +148,9 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                   value:
                       '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
                   progress: monthlyProgress,
-                  caption: '過去30日分のHiveデータを集計',
+                  caption: '過去30日間', // 技術詳細を削除
                 ),
-                const SizedBox(height: 24),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE7EBFF),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.lightbulb_rounded,
-                            color: Color(0xFF4A63F4),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'フォーカス維持の仕様',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'README記載どおり、画面オン中は継続し、ホームに戻るとRiverpod経由で'
-                                'タイマーを停止しHiveへ確定保存します。'
-                                'Wake LockとAppLifecycleObserverで安全に運用できます。',
-                                style: TextStyle(
-                                  color: Colors.black54,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // 技術仕様の説明カードは一般ユーザに不要なため削除
               ],
             ),
           ),
@@ -271,23 +214,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            '秒単位でリアルタイム更新 (Riverpod)',
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white70),
-          ),
-          const SizedBox(height: 28),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: const [
-              _InfoPill(icon: Icons.visibility_rounded, label: 'Wake Lock 有効'),
-              _InfoPill(
-                icon: Icons.phonelink_lock_rounded,
-                label: 'フォーカス外れで自動停止',
-              ),
-            ],
-          ),
+          // 技術詳細の表示は削除(リアルタイム更新やWake Lock情報)
         ],
       ),
     );

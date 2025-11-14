@@ -55,7 +55,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   child: ListView(
                     children: [
                       Text(
-                        '週間・月間目標の上限下限をREADME仕様に合わせて変更できます。',
+                        '週間・月間の目標時間を設定できます。', // シンプルでユーザ向けの説明に変更
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.black54,
                         ),
