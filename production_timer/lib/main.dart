@@ -88,9 +88,11 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   @override
   Widget build(BuildContext context) {
     // 現在のテーマ設定を取得(色やフォントなどの情報)
+    // final = 変更できない変数(値を一度代入したら変更不可)
     final theme = Theme.of(context);
 
     // Riverpodから各種状態を取得
+    // final = 変更できない変数。これらの値は画面が更新されるたびに最新の値が取得されます
     final timerState = ref.watch(timerControllerProvider); // タイマーの状態(実行中かどうか、経過時間など)
     final focusStats = ref.watch(focusStatsProvider); // 統計情報(今日の合計、週間・月間の合計)
     final settings = ref.watch(appSettingsProvider); // ユーザー設定(週間・月間の目標時間)
@@ -190,9 +192,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
           // タイマーが暗転モードの場合は真っ黒なオーバーレイのみを表示
           Positioned.fill(
             child: AnimatedOpacity(
-              // 黒画面を一瞬で切り替えず、徐々に暗転させて驚きを軽減する。
-              duration: const Duration(milliseconds: 350),
-              curve: Curves.easeOut,
+              // 黒画面を一瞬で切り替えず、ゆっくり暗転させて驚きを軽減する。
+              // 1.5秒かけてフェードイン/フェードアウトします
+              duration: const Duration(milliseconds: 1500),
+              curve: Curves.easeInOut, // なめらかに変化
               opacity: timerState.isBlackScreenActive ? 1 : 0,
               child: IgnorePointer(
                 ignoring: !timerState.isBlackScreenActive,
@@ -546,8 +549,8 @@ class _GoalProgressTile extends StatelessWidget {
 
 /// 黒画面オーバーレイ
 ///
-/// タイマー実行中に5秒経過すると表示される真っ黒な画面です。
-/// タップすると元の画面に戻ります(5秒後にまた黒画面になります)。
+/// タイマー実行中に5秒経過すると、1.5秒かけてゆっくり暗転します。
+/// タップすると1.5秒かけて元の画面に戻ります(その後5秒後にまた黒画面になります)。
 class _BlackScreenOverlay extends StatelessWidget {
   const _BlackScreenOverlay({required this.onTap});
 
