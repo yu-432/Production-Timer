@@ -1,192 +1,122 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:production_timer/services/time_storage_service.dart';
 
 void main() {
   runApp(const MyApp());
 }
 
-/*
- * ==========================================
- * TimeStorageService の使用例
- * ==========================================
- *
- * 1. 時間記録を保存する
- * ```dart
- * final service = TimeStorageService();
- * await service.saveTimeRecord(3600); // 1時間（3600秒）を保存
- * ```
- *
- * 2. 今日の記録を取得する
- * ```dart
- * final todayRecord = await service.getTodayRecord();
- * if (todayRecord != null) {
- *   print('今日の稼働時間: ${todayRecord.getFormattedTime()}');
- *   print('日付: ${todayRecord.date}');
- *   print('曜日: ${todayRecord.dayOfWeek}');
- * }
- * ```
- *
- * 3. 全ての記録を取得する
- * ```dart
- * final allRecords = await service.getAllTimeRecords();
- * for (var record in allRecords) {
- *   print('${record.date} (${record.dayOfWeek}): ${record.getFormattedTime()}');
- * }
- * ```
- *
- * 4. 累計稼働時間を取得する
- * ```dart
- * final totalSeconds = await service.getTotalSeconds();
- * print('全期間の累計: ${totalSeconds}秒');
- * ```
- *
- * 5. タイマーで計測した時間を保存する例
- * ```dart
- * // タイマー実装例
- * int elapsedSeconds = 0;
- * Timer.periodic(Duration(seconds: 1), (timer) {
- *   elapsedSeconds++;
- * });
- *
- * // タイマー停止時に保存
- * await service.saveTimeRecord(elapsedSeconds);
- * ```
- */
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
+  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Timer',
+      title: 'Flutter Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+        // This is the theme of your application.
+        //
+        // TRY THIS: Try running your application with "flutter run". You'll see
+        // the application has a purple toolbar. Then, without quitting the app,
+        // try changing the seedColor in the colorScheme below to Colors.green
+        // and then invoke "hot reload" (save your changes or press the "hot
+        // reload" button in a Flutter-supported IDE, or press "r" if you used
+        // the command line to start the app).
+        //
+        // Notice that the counter didn't reset back to zero; the application
+        // state is not lost during the reload. To reset the state, use hot
+        // restart instead.
+        //
+        // This works for code too, not just values: Most code changes can be
+        // tested with just a hot reload.
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const TimerPage(),
+      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class TimerPage extends StatefulWidget {
-  const TimerPage({super.key});
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  // This widget is the home page of your application. It is stateful, meaning
+  // that it has a State object (defined below) that contains fields that affect
+  // how it looks.
+
+  // This class is the configuration for the state. It holds the values (in this
+  // case the title) provided by the parent (in this case the App widget) and
+  // used by the build method of the State. Fields in a Widget subclass are
+  // always marked "final".
+
+  final String title;
 
   @override
-  State<TimerPage> createState() => _TimerPageState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _TimerPageState extends State<TimerPage> {
-  // 今日の0時からの経過秒数を保存する変数
-  int _seconds = 0;
+class _MyHomePageState extends State<MyHomePage> {
+  int _counter = 0;
 
-  // タイマーが動いているかどうかを管理するフラグ
-  bool _isRunning = false;
-
-  // Timerオブジェクトを保存する変数
-  Timer? _timer;
-
-  // TimeStorageServiceのインスタンス
-  final TimeStorageService _storageService = TimeStorageService();
-
-  // 今日の0時（深夜）の日時を取得する関数
-  DateTime _getTodayMidnight() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
-
-  // 今日の0時からの経過秒数を計算する関数
-  int _getSecondsFromMidnight() {
-    final now = DateTime.now();
-    final midnight = _getTodayMidnight();
-    return now.difference(midnight).inSeconds;
-  }
-
-  // タイマーをスタート/ストップする関数
-  void _toggleTimer() async {
-    if (_isRunning) {
-      // タイマーが動いている場合は停止
-      _timer?.cancel();
-      setState(() {
-        _isRunning = false;
-      });
-    } else {
-      // タイマーが停止している場合は開始
-      // 今日の保存済み秒数を取得
-      final todayRecord = await _storageService.getTodayRecord();
-
-      setState(() {
-        _isRunning = true;
-        // 保存済み秒数がある場合はその秒数から開始、なければ0から開始
-        _seconds = todayRecord?.totalSeconds ?? 0;
-
-        _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          setState(() {
-            // 1秒ずつカウントアップ
-            _seconds++;
-          });
-        });
-      });
-    }
-  }
-
-  // 秒数を「HH:MM:SS」形式の文字列に変換する関数
-  String _formatTime(int totalSeconds) {
-    int hours = totalSeconds ~/ 3600;
-    int minutes = (totalSeconds % 3600) ~/ 60;
-    int seconds = totalSeconds % 60;
-
-    // 2桁のゼロ埋め形式で返す（例：01:05:09）
-    return '${hours.toString().padLeft(2, '0')}:'
-           '${minutes.toString().padLeft(2, '0')}:'
-           '${seconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  void dispose() {
-    // ウィジェットが破棄される時にタイマーをキャンセル
-    _timer?.cancel();
-    super.dispose();
+  void _incrementCounter() {
+    setState(() {
+      // This call to setState tells the Flutter framework that something has
+      // changed in this State, which causes it to rerun the build method below
+      // so that the display can reflect the updated values. If we changed
+      // _counter without calling setState(), then the build method would not be
+      // called again, and so nothing would appear to happen.
+      _counter++;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    // This method is rerun every time setState is called, for instance as done
+    // by the _incrementCounter method above.
+    //
+    // The Flutter framework has been optimized to make rerunning build methods
+    // fast, so that you can just rebuild anything that needs updating rather
+    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
+        // TRY THIS: Try changing the color here to a specific color (to
+        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
+        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Timer'),
-        centerTitle: true,
+        // Here we take the value from the MyHomePage object that was created by
+        // the App.build method, and use it to set our appbar title.
+        title: Text(widget.title),
       ),
       body: Center(
+        // Center is a layout widget. It takes a single child and positions it
+        // in the middle of the parent.
         child: Column(
+          // Column is also a layout widget. It takes a list of children and
+          // arranges them vertically. By default, it sizes itself to fit its
+          // children horizontally, and tries to be as tall as its parent.
+          //
+          // Column has various properties to control how it sizes itself and
+          // how it positions its children. Here we use mainAxisAlignment to
+          // center the children vertically; the main axis here is the vertical
+          // axis because Columns are vertical (the cross axis would be
+          // horizontal).
+          //
+          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
+          // action in the IDE, or press "p" in the console), to see the
+          // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // タイマーの表示
+          children: <Widget>[
+            const Text('You have pushed the button this many times:'),
             Text(
-              _formatTime(_seconds),
-              style: const TextStyle(
-                fontSize: 72,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-              ),
-            ),
-            const SizedBox(height: 60),
-            // Start/Stopボタン
-            ElevatedButton(
-              onPressed: _toggleTimer,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 60,
-                  vertical: 20,
-                ),
-                textStyle: const TextStyle(fontSize: 24),
-              ),
-              child: Text(_isRunning ? 'STOP' : 'START'),
+              '$_counter',
+              style: Theme.of(context).textTheme.headlineMedium,
             ),
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _incrementCounter,
+        tooltip: 'Increment',
+        child: const Icon(Icons.add),
+      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
