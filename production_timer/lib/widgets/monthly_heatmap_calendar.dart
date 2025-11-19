@@ -66,12 +66,22 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
           dayStat.date.month == now.month &&
           dayStat.date.day == now.day;
 
+      // 吹き出し形式で詳細を表示するメッセージ
+      // 作業時間がある場合は時間を表示、ない場合は「記録なし」と表示
+      final tooltipMessage = dayStat.totalSeconds > 0
+          ? '${dayStat.date.month}月${dayStat.date.day}日${isToday ? '（今日）' : ''}\n${dayStat.formattedDuration}'
+          : '${dayStat.date.month}月${dayStat.date.day}日${isToday ? '（今日）' : ''}\n記録なし';
+
       calendarCells.add(
-        GestureDetector(
-          onTap: () {
-            // タップ時に詳細を表示
-            _showDayDetail(context, dayStat);
-          },
+        // Tooltipウィジェットでホバー(タップ)時に吹き出し表示
+        Tooltip(
+          message: tooltipMessage,
+          // モバイルではロングプレスで表示、デスクトップではホバーで表示
+          triggerMode: TooltipTriggerMode.tap,
+          // 吹き出しの表示時間を3秒に設定
+          showDuration: const Duration(seconds: 3),
+          // 吹き出しの待機時間を100ミリ秒に設定(すぐに表示)
+          waitDuration: const Duration(milliseconds: 100),
           child: Container(
             decoration: BoxDecoration(
               color: color,
@@ -118,7 +128,7 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              '各日をタップすると詳細が表示されます',
+              '各日をタップすると吹き出しで詳細が表示されます',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey,
@@ -218,50 +228,6 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-
-  /// 日の詳細ダイアログを表示
-  void _showDayDetail(BuildContext context, DailyStats dayStat) {
-    final now = DateTime.now();
-    final isToday = dayStat.date.year == now.year &&
-        dayStat.date.month == now.month &&
-        dayStat.date.day == now.day;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          '${dayStat.date.month}月${dayStat.date.day}日${isToday ? '（今日）' : ''}',
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '作業時間',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              dayStat.totalSeconds > 0 ? dayStat.formattedDuration : '記録なし',
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
-          ),
-        ],
       ),
     );
   }

@@ -169,10 +169,10 @@ class TimerController extends StateNotifier<TimerState> {
   /// タイマーが実行中に別のカテゴリーをタップした場合:
   /// 1. 現在のセッションを停止・保存(これまでの時間を記録)
   /// 2. 新しいカテゴリーで新規セッションを開始
-  /// 3. UI表示のタイマーは継続、内部的には新しいカテゴリーの時間を0からカウント
+  /// 3. UI表示のタイマーを0にリセット(ユーザーに新しい項目が始まったことを明示)
   ///
   /// この処理により:
-  /// - ユーザーには継続的にカウントアップするタイマーが表示される
+  /// - ユーザーには項目切り替え時にタイマーが0からスタートする画面が表示される
   /// - 各カテゴリーには正確な時間が個別に記録される
   ///
   /// [newCategoryId] 切り替え先のカテゴリーID
@@ -202,13 +202,13 @@ class TimerController extends StateNotifier<TimerState> {
     );
 
     // 3. 状態を更新
-    // sessionElapsedは継続(UI表示はそのまま)
-    // currentSessionStartOffsetに現在のsessionElapsedを設定
-    // → 新しいカテゴリーの経過時間 = sessionElapsed - currentSessionStartOffset = 0秒
+    // sessionElapsedを0にリセット(UI表示を0からスタート)
+    // currentSessionStartOffsetも0にリセット(新しいカテゴリーの経過時間を0から記録)
     state = state.copyWith(
       activeRecordId: newRecord.id,
       startedAt: newRecord.startedAt,
-      currentSessionStartOffset: state.sessionElapsed, // この時点の時間を記録
+      sessionElapsed: Duration.zero, // UI表示を0にリセット
+      currentSessionStartOffset: Duration.zero, // 新しいカテゴリーの経過時間を0から記録
       persistedDuration: Duration.zero, // 新しいセッションなのでリセット
     );
 
