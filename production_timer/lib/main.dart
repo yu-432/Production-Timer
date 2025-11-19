@@ -231,9 +231,18 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                   category: category,
                   isSelected: isSelected,
                   duration: todayDuration,
-                  onTap: () {
-                    // カテゴリーを選択
+                  onTap: () async {
+                    // タイマーが実行中かどうかを確認
+                    final timerState = ref.read(timerControllerProvider);
+
+                    // 選択カテゴリーを更新
                     ref.read(selectedCategoryIdProvider.notifier).state = category.id;
+
+                    // タイマー実行中の場合は、セッションを切り替える
+                    // (現在のセッションを保存して、新しいカテゴリーで開始)
+                    if (timerState.isRunning) {
+                      await ref.read(timerControllerProvider.notifier).switchCategory(category.id);
+                    }
                   },
                 ),
               );

@@ -162,6 +162,51 @@ class TimerController extends StateNotifier<TimerState> {
     state = TimerState.initial();
   }
 
+  /// カテゴリーを切り替える(タイマー実行中のみ有効)
+  ///
+  /// タイマーが実行中に別のカテゴリーをタップした場合:
+  /// 1. 現在のセッションを停止・保存(これまでの時間を記録)
+  /// 2. 新しいカテゴリーで新規セッションを開始
+  /// 3. タイマーは継続(経過時間表示はリセットしない)
+  ///
+  /// この処理により、各カテゴリーに正確な時間が記録されます。
+  ///
+  /// [newCategoryId] 切り替え先のカテゴリーID
+  Future<void> switchCategory(String newCategoryId) async {
+    // タイマーが実行中でない場合は、単に選択カテゴリーを変更するだけ
+    if (!state.isRunning) {
+      return;
+    }
+
+    // 現在のセッション情報を保存
+    final currentRecordId = state.activeRecordId!;
+    final currentElapsed = state.sessionElapsed;
+
+    // 1. 現在のセッションを完了させる(DBに保存)
+    await storage.completeSession(
+      recordId: currentRecordId,
+      elapsed: currentElapsed,
+      endedAt: DateTime.now(),
+    );
+
+    // 2. 新しいカテゴリーで新規セッションを開始
+    final newRecord = await storage.startNewSession(
+      DateTime.now(),
+      categoryId: newCategoryId,
+    );
+
+    // 3. 状態を更新(新しいセッションIDに切り替え、経過時間は継続)
+    state = state.copyWith(
+      activeRecordId: newRecord.id,
+      startedAt: newRecord.startedAt,
+      // sessionElapsedはそのまま(タイマー表示を継続)
+      persistedDuration: Duration.zero, // 新しいセッションなのでリセット
+    );
+
+    // 注: タイマー(_ticker)と黒画面タイマーはそのまま継続
+    // Wake Lockも既に有効なのでそのまま
+  }
+
   /// 1秒ごとに呼ばれる関数
   ///
   /// 経過時間を1秒増やし、必要に応じてDBに保存します。
