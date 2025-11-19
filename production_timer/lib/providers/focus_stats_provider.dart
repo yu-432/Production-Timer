@@ -60,9 +60,10 @@ final focusStatsProvider = Provider<FocusStats>((ref) {
 
   // タイマーが実行中の場合、まだDBに保存されていない経過時間を追加
   if (timerState.isRunning && timerState.hasActiveRecord) {
-    // 現在の経過時間 - 最後にDBに保存した時間 = 未保存の秒数
+    // 現在のカテゴリーの経過時間 - 最後にDBに保存した時間 = 未保存の秒数
+    // currentCategoryElapsedを使用して、現在のカテゴリーの実際の経過時間を取得
     final extraSeconds =
-        timerState.sessionElapsed.inSeconds -
+        timerState.currentCategoryElapsed.inSeconds -
         timerState.persistedDuration.inSeconds;
 
     // 未保存の秒数がある場合、全ての期間に加算

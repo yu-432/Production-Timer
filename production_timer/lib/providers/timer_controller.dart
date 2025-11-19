@@ -87,6 +87,7 @@ class TimerController extends StateNotifier<TimerState> {
       startedAt: activeRecord.startedAt,
       activeRecordId: activeRecord.id,
       isBlackScreenActive: false, // 黒画面は非表示でスタート
+      currentSessionStartOffset: Duration.zero, // 新しいセッションなので0からスタート
     );
 
     // 画面がスリープしないようにする
@@ -121,7 +122,8 @@ class TimerController extends StateNotifier<TimerState> {
 
     // 現在の状態から必要な情報を取得
     final recordId = state.activeRecordId!;
-    final elapsed = state.sessionElapsed;
+    // 現在のカテゴリーで実際に経過した時間を計算
+    final elapsed = state.currentCategoryElapsed;
 
     // DBに終了時刻を記録(endedAtを設定してセッションを完了)
     await storage.completeSession(
@@ -167,9 +169,11 @@ class TimerController extends StateNotifier<TimerState> {
   /// タイマーが実行中に別のカテゴリーをタップした場合:
   /// 1. 現在のセッションを停止・保存(これまでの時間を記録)
   /// 2. 新しいカテゴリーで新規セッションを開始
-  /// 3. タイマーは継続(経過時間表示はリセットしない)
+  /// 3. UI表示のタイマーは継続、内部的には新しいカテゴリーの時間を0からカウント
   ///
-  /// この処理により、各カテゴリーに正確な時間が記録されます。
+  /// この処理により:
+  /// - ユーザーには継続的にカウントアップするタイマーが表示される
+  /// - 各カテゴリーには正確な時間が個別に記録される
   ///
   /// [newCategoryId] 切り替え先のカテゴリーID
   Future<void> switchCategory(String newCategoryId) async {
@@ -180,12 +184,14 @@ class TimerController extends StateNotifier<TimerState> {
 
     // 現在のセッション情報を保存
     final currentRecordId = state.activeRecordId!;
-    final currentElapsed = state.sessionElapsed;
+    // 現在のカテゴリーで実際に経過した時間を計算
+    final currentCategoryElapsed = state.currentCategoryElapsed;
 
     // 1. 現在のセッションを完了させる(DBに保存)
+    // 注: sessionElapsedではなく、currentCategoryElapsedを保存する
     await storage.completeSession(
       recordId: currentRecordId,
-      elapsed: currentElapsed,
+      elapsed: currentCategoryElapsed,
       endedAt: DateTime.now(),
     );
 
@@ -195,11 +201,14 @@ class TimerController extends StateNotifier<TimerState> {
       categoryId: newCategoryId,
     );
 
-    // 3. 状態を更新(新しいセッションIDに切り替え、経過時間は継続)
+    // 3. 状態を更新
+    // sessionElapsedは継続(UI表示はそのまま)
+    // currentSessionStartOffsetに現在のsessionElapsedを設定
+    // → 新しいカテゴリーの経過時間 = sessionElapsed - currentSessionStartOffset = 0秒
     state = state.copyWith(
       activeRecordId: newRecord.id,
       startedAt: newRecord.startedAt,
-      // sessionElapsedはそのまま(タイマー表示を継続)
+      currentSessionStartOffset: state.sessionElapsed, // この時点の時間を記録
       persistedDuration: Duration.zero, // 新しいセッションなのでリセット
     );
 
@@ -262,28 +271,33 @@ class TimerController extends StateNotifier<TimerState> {
   ///
   /// アプリが突然終了しても、最大30秒分のデータしか失われないようにするため、
   /// 定期的にDBに保存します。
-  Future<void> _persistProgress(Duration elapsed) async {
+  ///
+  /// [totalElapsed] UI表示用の総経過時間
+  Future<void> _persistProgress(Duration totalElapsed) async {
     // タイマーが動いていない、またはセッションがない場合は何もしない
     if (!state.isRunning || !state.hasActiveRecord) {
       return;
     }
 
+    // 現在のカテゴリーで実際に経過した時間を計算
+    final currentCategoryElapsed = totalElapsed - state.currentSessionStartOffset;
+
     // 前回保存してからの経過秒数を計算
-    final deltaSeconds = elapsed.inSeconds - state.persistedDuration.inSeconds;
+    final deltaSeconds = currentCategoryElapsed.inSeconds - state.persistedDuration.inSeconds;
 
     // 30秒未満の場合は保存しない(30秒ごとに保存)
     if (deltaSeconds < 30) {
       return;
     }
 
-    // DBに経過時間を保存
+    // DBに現在のカテゴリーの経過時間を保存
     await storage.updateRunningSession(
       recordId: state.activeRecordId!,
-      elapsed: elapsed,
+      elapsed: currentCategoryElapsed,
     );
 
-    // 最後に保存した時間を更新
-    state = state.copyWith(persistedDuration: elapsed);
+    // 最後に保存した時間を更新(現在のカテゴリーの経過時間)
+    state = state.copyWith(persistedDuration: currentCategoryElapsed);
   }
 
   /// アプリ起動時に未完了のセッションを復元する
@@ -306,6 +320,7 @@ class TimerController extends StateNotifier<TimerState> {
       startedAt: activeRecord.startedAt,
       activeRecordId: activeRecord.id,
       isBlackScreenActive: false,
+      currentSessionStartOffset: Duration.zero, // 復元時は0からスタート
     );
   }
 

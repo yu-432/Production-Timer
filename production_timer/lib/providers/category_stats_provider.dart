@@ -54,7 +54,8 @@ final categoryStatsProvider = Provider<Map<String, Duration>>((ref) {
       final categoryId = activeRecord.categoryId;
       if (categoryId != null) {
         // DBに保存されている時間との差分を計算
-        final unsavedDuration = timerState.sessionElapsed - activeRecord.duration;
+        // currentCategoryElapsedを使用して、現在のカテゴリーの実際の経過時間を取得
+        final unsavedDuration = timerState.currentCategoryElapsed - activeRecord.duration;
         if (unsavedDuration > Duration.zero) {
           final currentDuration = stats[categoryId] ?? Duration.zero;
           stats[categoryId] = currentDuration + unsavedDuration;
