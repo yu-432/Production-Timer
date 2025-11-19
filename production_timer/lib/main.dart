@@ -155,18 +155,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: FocusStatCard(
-                        icon: Icons.timelapse_rounded,
-                        title: '現在のセッション',
-                        value: _formatDuration(timerState.sessionElapsed),
-                        caption: timerState.isRunning
-                            ? 'フォーカス中'
-                            : (timerState.hasActiveRecord ? '再開待機' : '停止中'),
-                        color: Colors.pink.shade50,
-                        accentColor: const Color(0xFFFF7B6B),
-                      ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
