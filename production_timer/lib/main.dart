@@ -7,6 +7,7 @@ import 'providers/focus_stats_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/storage_provider.dart';
 import 'providers/timer_controller.dart';
+import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'services/storage_service.dart';
 
@@ -85,14 +86,15 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   // 現在選択されているタブのインデックス
-  // 0 = タイマー画面、1 = 設定画面
+  // 0 = タイマー画面、1 = 振り返り画面、2 = 設定画面
   int _currentIndex = 0;
 
   // タブごとに表示する画面のリスト
-  // インデックスと対応: 0=TimerScreen, 1=SettingsScreen
+  // インデックスと対応: 0=TimerScreen, 1=HistoryScreen, 2=SettingsScreen
   final List<Widget> _screens = const [
     TimerScreen(), // タブ0: タイマー画面
-    SettingsScreen(), // タブ1: 設定画面
+    HistoryScreen(), // タブ1: 振り返り画面
+    SettingsScreen(), // タブ2: 設定画面
   ];
 
   @override
@@ -116,7 +118,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             icon: Icon(Icons.timer_rounded),
             label: 'タイマー',
           ),
-          // タブ1: 設定
+          // タブ1: 振り返り
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_rounded),
+            label: '振り返り',
+          ),
+          // タブ2: 設定
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_rounded),
             label: '設定',
