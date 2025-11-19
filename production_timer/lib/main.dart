@@ -77,14 +77,18 @@ class ProductionTimerApp extends ConsumerWidget {
 ///
 /// 画面下部のBottomNavigationBarで「タイマー」と「設定」を切り替えます。
 /// StatefulWidgetを使って、現在選択されているタブの状態を管理します。
-class MainNavigationScreen extends StatefulWidget {
+///
+/// 黒画面オーバーレイについて:
+/// タイマー実行中に画面全体(ヘッダーとタブバーを含む)を暗転させるため、
+/// Scaffoldの外側にStackを配置して、全画面を覆うオーバーレイを実装しています。
+class MainNavigationScreen extends ConsumerStatefulWidget {
   const MainNavigationScreen({super.key});
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   // 現在選択されているタブのインデックス
   // 0 = タイマー画面、1 = 振り返り画面、2 = 設定画面
   int _currentIndex = 0;
@@ -99,37 +103,68 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // 現在選択されているタブの画面を表示
-      body: _screens[_currentIndex],
-      // 画面下部のナビゲーションバー
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex, // 現在選択されているタブ
-        onTap: (index) {
-          // タブがタップされたら、選択タブを変更して画面を再描画
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        // タブの項目を定義
-        items: const [
-          // タブ0: タイマー
-          BottomNavigationBarItem(
-            icon: Icon(Icons.timer_rounded),
-            label: 'タイマー',
+    // タイマーの状態を監視して、黒画面が有効かどうかを取得
+    final timerState = ref.watch(timerControllerProvider);
+
+    // Stackを使って、Scaffoldの上に黒画面オーバーレイを重ねる
+    // これにより、AppBar(ヘッダー)とBottomNavigationBar(タブバー)も含めて暗転できます
+    return Stack(
+      children: [
+        // 通常の画面(タブバーとコンテンツ)
+        Scaffold(
+          // 現在選択されているタブの画面を表示
+          body: _screens[_currentIndex],
+          // 画面下部のナビゲーションバー
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex, // 現在選択されているタブ
+            onTap: (index) {
+              // タブがタップされたら、選択タブを変更して画面を再描画
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            // タブの項目を定義
+            items: const [
+              // タブ0: タイマー
+              BottomNavigationBarItem(
+                icon: Icon(Icons.timer_rounded),
+                label: 'タイマー',
+              ),
+              // タブ1: 振り返り
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                label: '振り返り',
+              ),
+              // タブ2: 設定
+              BottomNavigationBarItem(
+                icon: Icon(Icons.settings_rounded),
+                label: '設定',
+              ),
+            ],
           ),
-          // タブ1: 振り返り
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history_rounded),
-            label: '振り返り',
+        ),
+        // 画面全体を覆う黒画面オーバーレイ
+        // タイマー実行中のみ表示され、ヘッダーとタブバーも含めて暗転します
+        Positioned.fill(
+          child: AnimatedOpacity(
+            // 黒画面を一瞬で切り替えず、ゆっくり暗転させて驚きを軽減する。
+            // 1.5秒かけてフェードイン/フェードアウトします
+            duration: const Duration(milliseconds: 1500),
+            curve: Curves.easeInOut, // なめらかに変化
+            opacity: timerState.isBlackScreenActive ? 1 : 0,
+            child: IgnorePointer(
+              // 黒画面が非表示の時はタップを無視して、下の画面を操作できるようにする
+              ignoring: !timerState.isBlackScreenActive,
+              child: _BlackScreenOverlay(
+                onTap: () {
+                  // 黒画面をタップしたら解除する
+                  ref.read(timerControllerProvider.notifier).exitBlackScreen();
+                },
+              ),
+            ),
           ),
-          // タブ2: 設定
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_rounded),
-            label: '設定',
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -180,74 +215,57 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         elevation: 0,
         // 設定アイコンは削除(画面下部のタブバーから設定画面に移動できるため)
       ),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              children: [
-                // ユーザ向けの説明は不要なため削除
-                _buildTimerCard(theme, timerState),
-                const SizedBox(height: 16),
-                _buildControls(theme, timerState),
-                const SizedBox(height: 28),
-                Text(
-                  '今日の記録',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FocusStatCard(
-                        icon: Icons.calendar_today_rounded,
-                        title: '本日の合計',
-                        value: _formatDuration(focusStats.todayTotal),
-                        caption: '自動保存されます', // 技術詳細を削除してシンプルに
-                        color: Colors.indigo.shade50,
-                        accentColor: const Color(0xFF4A63F4),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                _GoalProgressTile(
-                  title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
-                  value:
-                      '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
-                  progress: weeklyProgress,
-                  caption: '過去7日間', // シンプルな表現に変更
-                ),
-                const SizedBox(height: 12),
-                _GoalProgressTile(
-                  title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
-                  value:
-                      '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
-                  progress: monthlyProgress,
-                  caption: '過去30日間', // 技術詳細を削除
-                ),
-                // 技術仕様の説明カードは一般ユーザに不要なため削除
-              ],
-            ),
-          ),
-          // タイマーが暗転モードの場合は真っ黒なオーバーレイのみを表示
-          Positioned.fill(
-            child: AnimatedOpacity(
-              // 黒画面を一瞬で切り替えず、ゆっくり暗転させて驚きを軽減する。
-              // 1.5秒かけてフェードイン/フェードアウトします
-              duration: const Duration(milliseconds: 1500),
-              curve: Curves.easeInOut, // なめらかに変化
-              opacity: timerState.isBlackScreenActive ? 1 : 0,
-              child: IgnorePointer(
-                ignoring: !timerState.isBlackScreenActive,
-                child: _BlackScreenOverlay(onTap: _handleBlackScreenTap),
+      // 黒画面オーバーレイはMainNavigationScreenに移動したため、ここでは削除
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          children: [
+            // ユーザ向けの説明は不要なため削除
+            _buildTimerCard(theme, timerState),
+            const SizedBox(height: 16),
+            _buildControls(theme, timerState),
+            const SizedBox(height: 28),
+            Text(
+              '今日の記録',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FocusStatCard(
+                    icon: Icons.calendar_today_rounded,
+                    title: '本日の合計',
+                    value: _formatDuration(focusStats.todayTotal),
+                    caption: '自動保存されます', // 技術詳細を削除してシンプルに
+                    color: Colors.indigo.shade50,
+                    accentColor: const Color(0xFF4A63F4),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _GoalProgressTile(
+              title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
+              value:
+                  '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
+              progress: weeklyProgress,
+              caption: '過去7日間', // シンプルな表現に変更
+            ),
+            const SizedBox(height: 12),
+            _GoalProgressTile(
+              title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
+              value:
+                  '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
+              progress: monthlyProgress,
+              caption: '過去30日間', // 技術詳細を削除
+            ),
+            // 技術仕様の説明カードは一般ユーザに不要なため削除
+          ],
+        ),
       ),
     );
   }
@@ -369,14 +387,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     } else {
       await notifier.startTimer(); // 停止中なら開始
     }
-  }
-
-  /// 黒画面をタップした時の処理
-  ///
-  /// 黒画面を解除して、タイマー画面に戻します。
-  /// 5秒後にまた黒画面になります。
-  void _handleBlackScreenTap() {
-    ref.read(timerControllerProvider.notifier).exitBlackScreen();
   }
 
   /// タイマーをリセット
