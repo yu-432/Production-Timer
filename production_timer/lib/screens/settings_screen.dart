@@ -55,6 +55,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('設定'),
+        // タブバーで画面を切り替えるため、戻るボタンは不要
+        // 自動的に戻るボタンは表示されません
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: Padding(
@@ -151,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 2. 保存中状態に変更(ボタンを無効化)
   /// 3. 時間単位の入力値を分単位に変換
   /// 4. Hiveに保存
-  /// 5. 画面を閉じて、成功を示すtrueを返す
+  /// 5. 成功メッセージを表示
   Future<void> _handleSave() async {
     // バリデーションエラーがあれば何もしない
     if (!_formKey.currentState!.validate()) {
@@ -182,8 +185,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // 保存中フラグをOFF
     setState(() => _isSaving = false);
 
-    // 画面を閉じて、成功を示すtrueを返す(呼び出し元で成功メッセージを表示)
-    Navigator.of(context).pop(true);
+    // 保存成功メッセージを表示(タブバーで切り替えるため画面は閉じない)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('目標設定を更新しました')),
+    );
   }
 
   /// 分単位を時間単位に変換
