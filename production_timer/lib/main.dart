@@ -66,8 +66,63 @@ class ProductionTimerApp extends ConsumerWidget {
           ),
         ),
       ),
-      // 最初に表示する画面をタイマー画面に設定
-      home: const TimerScreen(),
+      // 最初に表示する画面をタブバー付きのメイン画面に設定
+      home: const MainNavigationScreen(),
+    );
+  }
+}
+
+/// タブバーを持つメイン画面
+///
+/// 画面下部のBottomNavigationBarで「タイマー」と「設定」を切り替えます。
+/// StatefulWidgetを使って、現在選択されているタブの状態を管理します。
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
+
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  // 現在選択されているタブのインデックス
+  // 0 = タイマー画面、1 = 設定画面
+  int _currentIndex = 0;
+
+  // タブごとに表示する画面のリスト
+  // インデックスと対応: 0=TimerScreen, 1=SettingsScreen
+  final List<Widget> _screens = const [
+    TimerScreen(), // タブ0: タイマー画面
+    SettingsScreen(), // タブ1: 設定画面
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // 現在選択されているタブの画面を表示
+      body: _screens[_currentIndex],
+      // 画面下部のナビゲーションバー
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex, // 現在選択されているタブ
+        onTap: (index) {
+          // タブがタップされたら、選択タブを変更して画面を再描画
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        // タブの項目を定義
+        items: const [
+          // タブ0: タイマー
+          BottomNavigationBarItem(
+            icon: Icon(Icons.timer_rounded),
+            label: 'タイマー',
+          ),
+          // タブ1: 設定
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_rounded),
+            label: '設定',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -116,13 +171,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         title: const Text('Production Timer'),
         centerTitle: false,
         elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: '設定',
-            onPressed: _openSettings,
-            icon: const Icon(Icons.settings_rounded),
-          ),
-        ],
+        // 設定アイコンは削除(画面下部のタブバーから設定画面に移動できるため)
       ),
       body: Stack(
         children: [
@@ -321,23 +370,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   /// 5秒後にまた黒画面になります。
   void _handleBlackScreenTap() {
     ref.read(timerControllerProvider.notifier).exitBlackScreen();
-  }
-
-  /// 設定画面を開く
-  ///
-  /// 設定画面で保存ボタンを押すと、trueが返ってきて成功メッセージを表示します。
-  Future<void> _openSettings() async {
-    final saved = await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
-    // 画面が既に閉じられている、または保存していない場合は何もしない
-    if (!mounted || saved != true) {
-      return;
-    }
-    // 保存成功メッセージを表示
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('目標設定を更新しました')),
-    );
   }
 
   /// タイマーをリセット
