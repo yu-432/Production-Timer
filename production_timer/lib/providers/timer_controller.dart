@@ -202,14 +202,13 @@ class TimerController extends StateNotifier<TimerState> {
     );
 
     // 3. 状態を更新
-    // sessionElapsedを0にリセット(UI表示を0からスタート)
-    // currentSessionStartOffsetも0にリセット(新しいカテゴリーの経過時間を0から記録)
+    // sessionElapsedはユーザーに見える「連続タイマー」として維持する
+    // currentSessionStartOffsetだけを更新すると、裏側のカテゴリー用タイマーだけが0から再計測される
     state = state.copyWith(
       activeRecordId: newRecord.id,
       startedAt: newRecord.startedAt,
-      sessionElapsed: Duration.zero, // UI表示を0にリセット
-      currentSessionStartOffset: Duration.zero, // 新しいカテゴリーの経過時間を0から記録
-      persistedDuration: Duration.zero, // 新しいセッションなのでリセット
+      currentSessionStartOffset: state.sessionElapsed, // 現在の合計時間を起点として裏側タイマーを0化
+      persistedDuration: Duration.zero, // 新しいカテゴリーなので裏側タイマー保存をリセット
     );
 
     // 注: タイマー(_ticker)と黒画面タイマーはそのまま継続

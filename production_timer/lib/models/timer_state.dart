@@ -7,7 +7,7 @@
 class TimerState {
   const TimerState({
     required this.isRunning, // タイマーが実行中かどうか
-    required this.sessionElapsed, // 現在のセッションの経過時間
+    required this.sessionElapsed, // 画面表示用の連続カウントアップタイマー
     required this.persistedDuration, // 最後にHiveに保存した時の経過時間
     required this.startedAt, // セッション開始日時
     required this.activeRecordId, // 実行中のTimerRecordのID
@@ -16,18 +16,18 @@ class TimerState {
   });
 
   final bool isRunning; // タイマーが実行中ならtrue
-  final Duration sessionElapsed; // UI表示用の総経過時間(カテゴリー切り替えでも継続)
+  final Duration sessionElapsed; // UI表示用の総経過時間(カテゴリー切替後も止まらない)
   final Duration persistedDuration; // 最後にDBに保存した時の経過時間(復旧時に使用)
   final DateTime? startedAt; // セッション開始日時(nullなら未開始)
   final String? activeRecordId; // 実行中のTimerRecordのID(nullなら記録なし)
   final bool isBlackScreenActive; // 黒画面オーバーレイが表示中ならtrue
 
-  /// 現在のセッション(カテゴリー)開始時のsessionElapsedの値
+  /// 現在のセッション(カテゴリー)開始時点での連続タイマー(sessionElapsed)の値
   ///
   /// カテゴリーを切り替えた時、その時点のsessionElapsedを記録します。
-  /// 現在のカテゴリーの実際の経過時間 = sessionElapsed - currentSessionStartOffset
-  /// これにより、UI表示は継続的にカウントアップしつつ、
-  /// 各カテゴリーの時間は正確に分離して記録できます。
+  /// 「画面表示用のタイマーは累積でカウントし続ける / 裏側の記録用は切り替えごとに0から」
+  /// という二重タイマーの仕組みを支えるフィールド。
+  /// 裏側の経過時間 = sessionElapsed - currentSessionStartOffset となる。
   final Duration currentSessionStartOffset;
 
   /// 初期状態を生成
