@@ -50,7 +50,7 @@ class ProductionTimerApp extends ConsumerWidget {
     const seedColor = Color(0xFF5F6AF3);
 
     return MaterialApp(
-      title: 'Production Timer',
+      title: '実稼働タイマー',
       theme: ThemeData(
         // Material Design 3を使用
         useMaterial3: true,
@@ -168,7 +168,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Production Timer'),
+        title: const Text('実稼働タイマー'),
         centerTitle: false,
         elevation: 0,
         // 設定アイコンは削除(画面下部のタブバーから設定画面に移動できるため)
