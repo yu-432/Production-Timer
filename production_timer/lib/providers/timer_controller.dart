@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/timer_state.dart';
 import '../services/storage_service.dart';
 import '../services/wake_lock_service.dart';
+import 'category_provider.dart';
 import 'storage_provider.dart';
 import 'wake_lock_provider.dart';
 
@@ -16,7 +17,7 @@ final timerControllerProvider =
     StateNotifierProvider<TimerController, TimerState>((ref) {
       final storage = ref.watch(storageServiceProvider);
       final wakeLock = ref.watch(wakeLockServiceProvider);
-      return TimerController(storage: storage, wakeLock: wakeLock);
+      return TimerController(storage: storage, wakeLock: wakeLock, ref: ref);
     });
 
 /// タイマーの中核となるロジックを管理するクラス
@@ -28,15 +29,17 @@ final timerControllerProvider =
 /// - 5秒後の黒画面表示
 /// - アプリがバックグラウンドに移った時の自動停止
 /// - 画面スリープの防止(Wake Lock)
+/// - カテゴリーごとの時間記録
 class TimerController extends StateNotifier<TimerState> {
   // コンストラクタ: 初期状態を設定し、未完了のセッションがあれば復元
-  TimerController({required this.storage, required this.wakeLock})
+  TimerController({required this.storage, required this.wakeLock, required this.ref})
     : super(TimerState.initial()) {
     _restoreDanglingSession(); // アプリ起動時に未完了セッションを復元
   }
 
   final StorageService storage; // データベースとのやり取り
   final WakeLockService wakeLock; // 画面スリープの制御
+  final Ref ref; // 他のプロバイダーにアクセスするためのRef
 
   Timer? _ticker; // 1秒ごとに時間を更新するタイマー
   Timer? _blackScreenTimer; // 5秒後に黒画面を表示するタイマー
@@ -67,7 +70,14 @@ class TimerController extends StateNotifier<TimerState> {
         : storage.getActiveRecord();
 
     // 既存セッションがなければ新規作成
-    activeRecord ??= await storage.startNewSession(DateTime.now());
+    // 現在選択中のカテゴリーIDを取得して記録に紐づける
+    if (activeRecord == null) {
+      final selectedCategoryId = ref.read(selectedCategoryIdProvider);
+      activeRecord = await storage.startNewSession(
+        DateTime.now(),
+        categoryId: selectedCategoryId,
+      );
+    }
 
     // 状態を「実行中」に更新
     state = state.copyWith(

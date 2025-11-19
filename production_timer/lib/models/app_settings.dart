@@ -49,7 +49,7 @@ class AppSettings {
 /// バイナリデータへの変換方法を定義する必要があります。
 class AppSettingsAdapter extends TypeAdapter<AppSettings> {
   @override
-  int get typeId => 1; // Hive内でこのデータ型を識別するID(他のアダプターと重複しないこと)
+  int get typeId => 2; // Hive内でこのデータ型を識別するID(typeId: 0=TimerRecord, 1=Category, 2=AppSettings)
 
   /// Hiveからデータを読み込んでAppSettingsオブジェクトに変換
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/category_provider.dart';
 import '../providers/settings_provider.dart';
 
 /// 週間・月間目標時間を設定する画面
@@ -52,6 +53,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final categories = ref.watch(categoryListProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('設定'),
@@ -69,13 +72,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 Expanded(
                   child: ListView(
                     children: [
+                      // 目標時間設定セクション
                       Text(
-                        '週間・月間の目標時間を設定できます。', // シンプルでユーザ向けの説明に変更
+                        '目標時間',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '週間・月間の目標時間を設定できます。',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.black54,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       _NumberField(
                         controller: _weeklyController,
                         label: '週間目標 (時間)',
@@ -86,7 +97,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           max: 168,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       _NumberField(
                         controller: _monthlyController,
                         label: '月間目標 (時間)',
@@ -97,6 +108,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           max: 744,
                         ),
                       ),
+                      const SizedBox(height: 32),
+
+                      // カテゴリー管理セクション
+                      Text(
+                        '項目設定',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '最大3つまで項目を管理できます。',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.black54,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // カテゴリーリスト
+                      ...categories.map((category) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ListTile(
+                            leading: Icon(
+                              category.icon,
+                              color: category.color,
+                              size: 28,
+                            ),
+                            title: Text(
+                              category.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () {
+                                _showEditCategoryDialog(category);
+                              },
+                            ),
+                          ),
+                        );
+                      }),
                     ],
                   ),
                 ),
@@ -112,7 +166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save_rounded),
-                    label: Text(_isSaving ? '保存中...' : '保存する'),
+                    label: Text(_isSaving ? '保存中...' : '目標時間を保存'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
@@ -195,6 +249,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   ///
   /// 整数除算(~/)を使って、端数を切り捨てます。
   int _minutesToHours(int minutes) => minutes ~/ 60;
+
+  /// カテゴリー編集ダイアログを表示
+  ///
+  /// カテゴリー名を変更できます。
+  Future<void> _showEditCategoryDialog(dynamic category) async {
+    final controller = TextEditingController(text: category.name);
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('項目名を変更'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: '項目名',
+              hintText: '例: 勉強、仕事、趣味',
+            ),
+            autofocus: true,
+            maxLength: 10, // 項目名は10文字まで
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final newName = controller.text.trim();
+                if (newName.isNotEmpty) {
+                  Navigator.pop(context, newName);
+                }
+              },
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null && result != category.name) {
+      // カテゴリー名を更新
+      await ref.read(categoryListProvider.notifier).updateCategory(
+            id: category.id,
+            name: result,
+            colorValue: category.colorValue,
+            iconCodePoint: category.iconCodePoint,
+          );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('項目名を更新しました')),
+      );
+    }
+  }
 }
 
 /// 数字入力欄のウィジェット

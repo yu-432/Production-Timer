@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/app_settings.dart';
+import '../models/category.dart';
 import '../models/timer_record.dart';
 
 /// データ永続化を担当するサービスクラス
@@ -11,20 +12,23 @@ import '../models/timer_record.dart';
 /// Hiveデータベースを使って、以下のデータを保存・読み込みします:
 /// - タイマーセッションの記録(TimerRecord)
 /// - アプリの設定(AppSettings)
+/// - カテゴリー(Category)
 ///
 /// このクラスは main.dart で初期化され、Riverpodプロバイダー経由で使用されます。
 class StorageService {
   // プライベートコンストラクタ(外部から直接インスタンス化できない)
-  StorageService._(this._timerBox, this._settingsBox);
+  StorageService._(this._timerBox, this._settingsBox, this._categoryBox);
 
   // Hiveのボックス名と定数
   static const _timerRecordsBox = 'timer_records'; // タイマー記録を保存するボックス
   static const _settingsBoxName = 'app_settings'; // 設定を保存するボックス
+  static const _categoryBoxName = 'categories'; // カテゴリーを保存するボックス
   static const _settingsKey = 'app_settings_singleton'; // 設定の保存キー
   static final _uuid = Uuid(); // UUID生成器(セッションIDに使用)
 
   final Box<TimerRecord> _timerBox; // タイマー記録用のHiveボックス
   final Box<AppSettings> _settingsBox; // 設定用のHiveボックス
+  final Box<Category> _categoryBox; // カテゴリー用のHiveボックス
 
   /// StorageServiceを初期化する
   ///
@@ -32,8 +36,8 @@ class StorageService {
   ///
   /// 処理の流れ:
   /// 1. Hiveを初期化
-  /// 2. TimerRecordとAppSettingsのアダプターを登録
-  /// 3. タイマー記録用と設定用のボックスを開く
+  /// 2. TimerRecord、AppSettings、Categoryのアダプターを登録
+  /// 3. タイマー記録用、設定用、カテゴリー用のボックスを開く
   /// 4. 設定が存在しなければデフォルト値を保存
   /// 5. StorageServiceインスタンスを返す
   static Future<StorageService> initialize() async {
@@ -44,14 +48,19 @@ class StorageService {
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(TimerRecordAdapter());
     }
-    // AppSettingsのアダプターを登録(typeId: 1)
-    if (!Hive.isAdapterRegistered(1)) {
+    // AppSettingsのアダプターを登録(typeId: 2に変更、typeId: 1はCategoryが使用)
+    if (!Hive.isAdapterRegistered(2)) {
       Hive.registerAdapter(AppSettingsAdapter());
+    }
+    // Categoryのアダプターを登録(typeId: 1)
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(CategoryAdapter());
     }
 
     // ボックスを開く(まだ存在しない場合は作成される)
     final timerBox = await Hive.openBox<TimerRecord>(_timerRecordsBox);
     final settingsBox = await Hive.openBox<AppSettings>(_settingsBoxName);
+    final categoryBox = await Hive.openBox<Category>(_categoryBoxName);
 
     // 設定が存在しなければデフォルト値を保存
     if (!settingsBox.containsKey(_settingsKey)) {
@@ -59,7 +68,7 @@ class StorageService {
     }
 
     // インスタンスを作成して返す
-    return StorageService._(timerBox, settingsBox);
+    return StorageService._(timerBox, settingsBox, categoryBox);
   }
 
   /// 現在の設定を取得
@@ -75,11 +84,13 @@ class StorageService {
   ///
   /// UUIDを生成して新しいTimerRecordを作成し、DBに保存します。
   /// 最初は経過時間0秒、endedAtはnull(未完了)の状態です。
-  Future<TimerRecord> startNewSession(DateTime startedAt) async {
+  /// categoryIdを指定することで、どの項目の記録かを記録します。
+  Future<TimerRecord> startNewSession(DateTime startedAt, {String? categoryId}) async {
     final record = TimerRecord(
       id: _uuid.v4(), // ランダムなUUIDを生成
       startedAt: startedAt,
       durationSeconds: 0, // 開始時は0秒
+      categoryId: categoryId, // カテゴリーIDを保存
     );
     await _timerBox.put(record.id, record); // IDをキーとして保存
     return record;
@@ -167,5 +178,28 @@ class StorageService {
     final records = _timerBox.values.toList()
       ..sort((a, b) => a.startedAt.compareTo(b.startedAt));
     return records;
+  }
+
+  // ========================================
+  // カテゴリー関連のメソッド
+  // ========================================
+
+  /// 全てのカテゴリーを取得
+  ///
+  /// 順序(order)でソートして返します。
+  Future<List<Category>> loadCategories() async {
+    final categories = _categoryBox.values.toList()
+      ..sort((a, b) => a.order.compareTo(b.order));
+    return categories;
+  }
+
+  /// カテゴリーリストを保存
+  ///
+  /// 既存のカテゴリーを全て削除してから、新しいリストを保存します。
+  Future<void> saveCategories(List<Category> categories) async {
+    await _categoryBox.clear(); // 既存のデータを削除
+    for (final category in categories) {
+      await _categoryBox.put(category.id, category); // IDをキーとして保存
+    }
   }
 }

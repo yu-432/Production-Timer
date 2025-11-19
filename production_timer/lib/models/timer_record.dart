@@ -10,12 +10,14 @@ class TimerRecord {
     required this.startedAt, // 開始日時
     this.endedAt, // 終了日時(実行中の場合はnull)
     required this.durationSeconds, // 経過時間(秒)
+    this.categoryId, // カテゴリーID(どの項目の記録か)
   });
 
   final String id; // セッションの一意なID(UUID形式)
   final DateTime startedAt; // セッション開始日時
   final DateTime? endedAt; // セッション終了日時(nullの場合は実行中)
   final int durationSeconds; // 経過時間(秒単位で保存)
+  final String? categoryId; // このセッションが属するカテゴリーのID(nullの場合は未分類)
 
   /// 開始日時から日付部分のみを取得
   ///
@@ -42,12 +44,14 @@ class TimerRecord {
     DateTime? startedAt,
     DateTime? endedAt,
     int? durationSeconds,
+    String? categoryId,
   }) {
     return TimerRecord(
       id: id, // IDは常に同じものを保持
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      categoryId: categoryId ?? this.categoryId,
     );
   }
 }
@@ -75,6 +79,17 @@ class TimerRecordAdapter extends TypeAdapter<TimerRecord> {
     final endedAtMillis = reader.readInt();
     final durationSeconds = reader.readInt(); // 経過秒数
 
+    // カテゴリーIDを読み込み(空文字列の場合はnull)
+    // 古いデータとの互換性のため、データがない場合はnullとして扱う
+    String? categoryId;
+    try {
+      final categoryIdString = reader.readString();
+      categoryId = categoryIdString.isEmpty ? null : categoryIdString;
+    } catch (e) {
+      // 古いバージョンのデータの場合、categoryIdフィールドが存在しない
+      categoryId = null;
+    }
+
     return TimerRecord(
       id: id,
       startedAt: startedAt,
@@ -85,6 +100,7 @@ class TimerRecordAdapter extends TypeAdapter<TimerRecord> {
               isUtc: true,
             ).toLocal(),
       durationSeconds: durationSeconds,
+      categoryId: categoryId,
     );
   }
 
@@ -98,6 +114,7 @@ class TimerRecordAdapter extends TypeAdapter<TimerRecord> {
         // endedAtがnullの場合は-1、それ以外はミリ秒に変換
         obj.endedAt == null ? -1 : obj.endedAt!.toUtc().millisecondsSinceEpoch,
       )
-      ..writeInt(obj.durationSeconds); // 経過秒数をそのまま保存
+      ..writeInt(obj.durationSeconds) // 経過秒数をそのまま保存
+      ..writeString(obj.categoryId ?? ''); // カテゴリーID(nullの場合は空文字列)
   }
 }

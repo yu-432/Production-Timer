@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'models/timer_state.dart';
 import 'providers/app_lifecycle_provider.dart';
-import 'providers/focus_stats_provider.dart';
-import 'providers/settings_provider.dart';
+import 'providers/category_provider.dart';
+import 'providers/category_stats_provider.dart';
 import 'providers/storage_provider.dart';
 import 'providers/timer_controller.dart';
 import 'screens/history_screen.dart';
@@ -191,22 +191,8 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     // Riverpodから各種状態を取得
     // final = 変更できない変数。これらの値は画面が更新されるたびに最新の値が取得されます
     final timerState = ref.watch(timerControllerProvider); // タイマーの状態(実行中かどうか、経過時間など)
-    final focusStats = ref.watch(focusStatsProvider); // 統計情報(今日の合計、週間・月間の合計)
-    final settings = ref.watch(appSettingsProvider); // ユーザー設定(週間・月間の目標時間)
-
-    // 設定から目標時間を取得(Hiveには分単位で保存されているので、時間に変換)
-    final weeklyGoalHours = settings.weeklyGoalMinutes / 60;
-    final monthlyGoalHours = settings.monthlyGoalMinutes / 60;
-
-    // 現在の進捗率を計算(0.0〜1.0の範囲)
-    final weeklyProgress = _progress(
-      focusStats.weeklyHours, // 実際の作業時間
-      weeklyGoalHours.toDouble(), // 目標時間
-    );
-    final monthlyProgress = _progress(
-      focusStats.monthlyHours,
-      monthlyGoalHours.toDouble(),
-    );
+    final categories = ref.watch(categoryListProvider); // カテゴリーリスト
+    final selectedCategoryId = ref.watch(selectedCategoryIdProvider); // 選択中のカテゴリー
 
     return Scaffold(
       appBar: AppBar(
@@ -220,11 +206,13 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            // ユーザ向けの説明は不要なため削除
+            // タイマー表示カード
             _buildTimerCard(theme, timerState),
             const SizedBox(height: 16),
+            // 開始/停止ボタン
             _buildControls(theme, timerState),
             const SizedBox(height: 28),
+            // 今日の記録セクション
             Text(
               '今日の記録',
               style: theme.textTheme.titleMedium?.copyWith(
@@ -232,38 +220,24 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: FocusStatCard(
-                    icon: Icons.calendar_today_rounded,
-                    title: '本日の合計',
-                    value: _formatDuration(focusStats.todayTotal),
-                    caption: '自動保存されます', // 技術詳細を削除してシンプルに
-                    color: Colors.indigo.shade50,
-                    accentColor: const Color(0xFF4A63F4),
-                  ),
+            // カテゴリーボタンリスト
+            ...categories.map((category) {
+              final isSelected = category.id == selectedCategoryId;
+              final todayDuration = ref.watch(categoryTodayDurationProvider(category.id));
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _CategoryButton(
+                  category: category,
+                  isSelected: isSelected,
+                  duration: todayDuration,
+                  onTap: () {
+                    // カテゴリーを選択
+                    ref.read(selectedCategoryIdProvider.notifier).state = category.id;
+                  },
                 ),
-                const SizedBox(width: 12),
-              ],
-            ),
-            const SizedBox(height: 24),
-            _GoalProgressTile(
-              title: '今週 ${weeklyGoalHours.toStringAsFixed(0)}h',
-              value:
-                  '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
-              progress: weeklyProgress,
-              caption: '日曜日から今日まで', // 週の範囲を明示
-            ),
-            const SizedBox(height: 12),
-            _GoalProgressTile(
-              title: '今月 ${monthlyGoalHours.toStringAsFixed(0)}h',
-              value:
-                  '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
-              progress: monthlyProgress,
-              caption: '今月1日から今日まで', // 月の範囲を明示
-            ),
-            // 技術仕様の説明カードは一般ユーザに不要なため削除
+              );
+            }),
           ],
         ),
       ),
@@ -394,17 +368,6 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
   /// 現在のセッションを削除して、時間を0に戻します。
   Future<void> _resetTimer() =>
       ref.read(timerControllerProvider.notifier).resetTimer();
-
-  /// 進捗率を計算(0.0〜1.0)
-  ///
-  /// 目標が0以下の場合は0を返します。
-  /// 実際の値が目標を超えても、1.0を超えないようにclampで制限します。
-  static double _progress(double value, double goal) {
-    if (goal <= 0) {
-      return 0;
-    }
-    return (value / goal).clamp(0.0, 1.0);
-  }
 }
 
 /// 経過時間を「HH:MM:SS」形式の文字列に変換
@@ -429,153 +392,76 @@ String _formatTodayLabel() {
   return '${now.month}月${now.day}日 ($weekday)';
 }
 
-/// 統計情報を表示するカード
+/// カテゴリーボタン
 ///
-/// 「本日の合計」や「現在のセッション」などの情報を
-/// アイコン付きのカードで見やすく表示します。
-class FocusStatCard extends StatelessWidget {
-  const FocusStatCard({
-    super.key,
-    required this.icon, // カードに表示するアイコン
-    required this.title, // カードのタイトル(例: "本日の合計")
-    required this.value, // 表示する値(例: "01:23:45")
-    required this.caption, // 補足説明(例: "自動保存されます")
-    required this.color, // カードの背景色
-    required this.accentColor, // アイコンの色
+/// 各項目(勉強、仕事など)を選択するためのボタンです。
+/// ボタン内に今日のその項目の合計時間が表示されます。
+class _CategoryButton extends StatelessWidget {
+  const _CategoryButton({
+    required this.category,
+    required this.isSelected,
+    required this.duration,
+    required this.onTap,
   });
 
-  final IconData icon;
-  final String title;
-  final String value;
-  final String caption;
-  final Color color;
-  final Color accentColor;
+  final dynamic category; // Categoryオブジェクト
+  final bool isSelected; // 現在選択中かどうか
+  final Duration duration; // 今日の合計時間
+  final VoidCallback onTap; // タップされた時の処理
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: accentColor),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.black.withValues(alpha: 0.6),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            caption,
-            style: TextStyle(color: Colors.black.withValues(alpha: 0.5)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoPill extends StatelessWidget {
-  const _InfoPill({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 18, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 目標進捗を表示するタイル
-///
-/// 週間目標や月間目標の達成度をプログレスバーで表示します。
-class _GoalProgressTile extends StatelessWidget {
-  const _GoalProgressTile({
-    required this.title, // タイトル(例: "週間目標 40h")
-    required this.value, // 進捗状況(例: "12.5h / 40h")
-    required this.progress, // 進捗率(0.0〜1.0)
-    required this.caption, // 補足説明(例: "過去7日間")
-  });
-
-  final String title;
-  final String value;
-  final double progress;
-  final String caption;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? category.color.withValues(alpha: 0.15)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? category.color : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
           children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+            // アイコン
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: category.color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                category.icon,
+                color: category.color,
+                size: 24,
               ),
             ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 10,
-                backgroundColor: theme.colorScheme.primary.withValues(
-                  alpha: 0.1,
+            const SizedBox(width: 16),
+            // カテゴリー名
+            Expanded(
+              child: Text(
+                category.name,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? category.color : Colors.black87,
                 ),
-                color: theme.colorScheme.primary,
               ),
             ),
-            const SizedBox(height: 8),
+            // 今日の合計時間
             Text(
-              caption,
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+              _formatDuration(duration),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: category.color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
           ],
         ),
@@ -583,6 +469,7 @@ class _GoalProgressTile extends StatelessWidget {
     );
   }
 }
+
 
 /// 黒画面オーバーレイ
 ///
