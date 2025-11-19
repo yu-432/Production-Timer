@@ -45,10 +45,10 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
     final currentYear = now.year;
     final currentMonth = now.month;
 
-    // 月の最初の日の曜日を取得（0=月曜, 6=日曜）
+    // 月の最初の日の曜日を取得(0=日曜, 6=土曜)
+    // DateTime.weekdayは月曜=1, 日曜=7なので、日曜始まりに調整
     final firstDayOfMonth = DateTime(currentYear, currentMonth, 1);
-    final firstWeekday =
-        firstDayOfMonth.weekday - 1; // DateTime.weekdayは1=月曜なので-1する
+    final firstWeekday = firstDayOfMonth.weekday % 7; // 日曜=0, 月曜=1, ..., 土曜=6
 
     // カレンダーのグリッド用のウィジェットリスト
     final List<Widget> calendarCells = [];
@@ -135,13 +135,13 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
               crossAxisSpacing: 4,
               childAspectRatio: 1,
               children: [
+                _buildWeekdayHeader('日'), // 日曜始まりに変更
                 _buildWeekdayHeader('月'),
                 _buildWeekdayHeader('火'),
                 _buildWeekdayHeader('水'),
                 _buildWeekdayHeader('木'),
                 _buildWeekdayHeader('金'),
                 _buildWeekdayHeader('土'),
-                _buildWeekdayHeader('日'),
               ],
             ),
 

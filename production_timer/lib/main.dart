@@ -249,19 +249,19 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
             ),
             const SizedBox(height: 24),
             _GoalProgressTile(
-              title: '週間目標 ${weeklyGoalHours.toStringAsFixed(0)}h',
+              title: '今週 ${weeklyGoalHours.toStringAsFixed(0)}h',
               value:
                   '${focusStats.weeklyHours.toStringAsFixed(1)}h / ${weeklyGoalHours.toStringAsFixed(0)}h',
               progress: weeklyProgress,
-              caption: '過去7日間', // シンプルな表現に変更
+              caption: '日曜日から今日まで', // 週の範囲を明示
             ),
             const SizedBox(height: 12),
             _GoalProgressTile(
-              title: '月間目標 ${monthlyGoalHours.toStringAsFixed(0)}h',
+              title: '今月 ${monthlyGoalHours.toStringAsFixed(0)}h',
               value:
                   '${focusStats.monthlyHours.toStringAsFixed(1)}h / ${monthlyGoalHours.toStringAsFixed(0)}h',
               progress: monthlyProgress,
-              caption: '過去30日間', // 技術詳細を削除
+              caption: '今月1日から今日まで', // 月の範囲を明示
             ),
             // 技術仕様の説明カードは一般ユーザに不要なため削除
           ],

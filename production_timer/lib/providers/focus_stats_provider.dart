@@ -7,8 +7,11 @@ import 'timer_records_provider.dart';
 
 /// 集中作業時間の統計情報を計算するプロバイダー
 ///
-/// 過去のタイマー記録から、今日・週間・月間の合計時間を計算します。
+/// 過去のタイマー記録から、今日・今週・今月の合計時間を計算します。
 /// 記録が更新されるたびに自動的に再計算され、UIに反映されます。
+///
+/// 週の定義: 日曜日から土曜日まで(日曜始まり)
+/// 月の定義: その月の1日から月末まで
 final focusStatsProvider = Provider<FocusStats>((ref) {
   // 全てのタイマー記録を取得
   // StreamProviderなのでmaybeWhenでラップ(データが取得できない場合は空リストを返す)
@@ -22,8 +25,14 @@ final focusStatsProvider = Provider<FocusStats>((ref) {
   // 日付の範囲を計算
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day); // 今日の0時0分0秒
-  final weeklyStart = today.subtract(const Duration(days: 6)); // 7日前の0時0分0秒
-  final monthlyStart = today.subtract(const Duration(days: 29)); // 30日前の0時0分0秒
+
+  // 今週の開始日を計算(日曜日始まり)
+  // DateTime.weekdayは月曜=1, 日曜=7なので、日曜を0にするため % 7 を使用
+  final weekdayOffset = now.weekday % 7; // 日曜=0, 月曜=1, ..., 土曜=6
+  final weeklyStart = today.subtract(Duration(days: weekdayOffset)); // 今週の日曜日
+
+  // 今月の開始日を計算(その月の1日)
+  final monthlyStart = DateTime(now.year, now.month, 1); // 今月1日の0時0分0秒
 
   // 各期間の合計秒数を初期化
   var todaySeconds = 0;
@@ -39,11 +48,11 @@ final focusStatsProvider = Provider<FocusStats>((ref) {
     if (recordDate == today) {
       todaySeconds += seconds;
     }
-    // 週間範囲内(7日以内)なら weeklySeconds に加算
+    // 今週の範囲内(今週の日曜日以降)なら weeklySeconds に加算
     if (!recordDate.isBefore(weeklyStart)) {
       weeklySeconds += seconds;
     }
-    // 月間範囲内(30日以内)なら monthlySeconds に加算
+    // 今月の範囲内(今月1日以降)なら monthlySeconds に加算
     if (!recordDate.isBefore(monthlyStart)) {
       monthlySeconds += seconds;
     }
