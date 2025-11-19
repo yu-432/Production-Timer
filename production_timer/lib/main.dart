@@ -106,65 +106,70 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     // タイマーの状態を監視して、黒画面が有効かどうかを取得
     final timerState = ref.watch(timerControllerProvider);
 
-    // Stackを使って、Scaffoldの上に黒画面オーバーレイを重ねる
-    // これにより、AppBar(ヘッダー)とBottomNavigationBar(タブバー)も含めて暗転できます
-    return Stack(
-      children: [
-        // 通常の画面(タブバーとコンテンツ)
-        Scaffold(
-          // 現在選択されているタブの画面を表示
-          body: _screens[_currentIndex],
-          // 画面下部のナビゲーションバー
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: _currentIndex, // 現在選択されているタブ
-            onTap: (index) {
-              // タブがタップされたら、選択タブを変更して画面を再描画
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            // タブの項目を定義
-            items: const [
-              // タブ0: タイマー
-              BottomNavigationBarItem(
-                icon: Icon(Icons.timer_rounded),
-                label: 'タイマー',
-              ),
-              // タブ1: 振り返り
-              BottomNavigationBarItem(
-                icon: Icon(Icons.history_rounded),
-                label: '振り返り',
-              ),
-              // タブ2: 設定
-              BottomNavigationBarItem(
-                icon: Icon(Icons.settings_rounded),
-                label: '設定',
-              ),
-            ],
+    // Listenerで画面全体のタップを監視し、最後のタップから5秒後に暗転するよう制御
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) {
+        ref.read(timerControllerProvider.notifier).registerUserInteraction();
+      },
+      child: Stack(
+        children: [
+          // 通常の画面(タブバーとコンテンツ)
+          Scaffold(
+            // 現在選択されているタブの画面を表示
+            body: _screens[_currentIndex],
+            // 画面下部のナビゲーションバー
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: _currentIndex, // 現在選択されているタブ
+              onTap: (index) {
+                // タブがタップされたら、選択タブを変更して画面を再描画
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              // タブの項目を定義
+              items: const [
+                // タブ0: タイマー
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.timer_rounded),
+                  label: 'タイマー',
+                ),
+                // タブ1: 振り返り
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.history_rounded),
+                  label: '振り返り',
+                ),
+                // タブ2: 設定
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.settings_rounded),
+                  label: '設定',
+                ),
+              ],
+            ),
           ),
-        ),
-        // 画面全体を覆う黒画面オーバーレイ
-        // タイマー実行中のみ表示され、ヘッダーとタブバーも含めて暗転します
-        Positioned.fill(
-          child: AnimatedOpacity(
-            // 黒画面を一瞬で切り替えず、ゆっくり暗転させて驚きを軽減する。
-            // 1.5秒かけてフェードイン/フェードアウトします
-            duration: const Duration(milliseconds: 1500),
-            curve: Curves.easeInOut, // なめらかに変化
-            opacity: timerState.isBlackScreenActive ? 1 : 0,
-            child: IgnorePointer(
-              // 黒画面が非表示の時はタップを無視して、下の画面を操作できるようにする
-              ignoring: !timerState.isBlackScreenActive,
-              child: _BlackScreenOverlay(
-                onTap: () {
-                  // 黒画面をタップしたら解除する
-                  ref.read(timerControllerProvider.notifier).exitBlackScreen();
-                },
+          // 画面全体を覆う黒画面オーバーレイ
+          // タイマー実行中のみ表示され、ヘッダーとタブバーも含めて暗転します
+          Positioned.fill(
+            child: AnimatedOpacity(
+              // 黒画面を一瞬で切り替えず、ゆっくり暗転させて驚きを軽減する。
+              // 1.5秒かけてフェードイン/フェードアウトします
+              duration: const Duration(milliseconds: 1500),
+              curve: Curves.easeInOut, // なめらかに変化
+              opacity: timerState.isBlackScreenActive ? 1 : 0,
+              child: IgnorePointer(
+                // 黒画面が非表示の時はタップを無視して、下の画面を操作できるようにする
+                ignoring: !timerState.isBlackScreenActive,
+                child: _BlackScreenOverlay(
+                  onTap: () {
+                    // 黒画面をタップしたら解除する
+                    ref.read(timerControllerProvider.notifier).exitBlackScreen();
+                  },
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -482,8 +487,8 @@ class _CategoryButton extends StatelessWidget {
 
 /// 黒画面オーバーレイ
 ///
-/// タイマー実行中に5秒経過すると、1.5秒かけてゆっくり暗転します。
-/// タップすると1.5秒かけて元の画面に戻ります(その後5秒後にまた黒画面になります)。
+/// タイマー実行中に「最後のタップから5秒」経過すると、1.5秒かけて暗転します。
+/// タップすると1.5秒かけて元の画面に戻り、再び最後のタップから5秒待って暗転します。
 class _BlackScreenOverlay extends StatelessWidget {
   const _BlackScreenOverlay({required this.onTap});
 

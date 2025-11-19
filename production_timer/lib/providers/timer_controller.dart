@@ -267,6 +267,18 @@ class TimerController extends StateNotifier<TimerState> {
     }
   }
 
+  /// ユーザーが画面をタップした時の処理
+  ///
+  /// 画面が暗転するタイミングを「最後にタップされた時刻から5秒後」にするため、
+  /// すべてのタップイベントでこの関数を呼び出してタイマーをリセットします。
+  void registerUserInteraction() {
+    if (!state.isRunning) {
+      return;
+    }
+
+    _scheduleBlackScreenOverlay();
+  }
+
   /// 経過時間をDBに保存する(30秒ごとに実行)
   ///
   /// アプリが突然終了しても、最大30秒分のデータしか失われないようにするため、
@@ -331,6 +343,10 @@ class TimerController extends StateNotifier<TimerState> {
   void _scheduleBlackScreenOverlay() {
     // 既存の黒画面タイマーがあればキャンセル
     _blackScreenTimer?.cancel();
+
+    if (!state.isRunning) {
+      return;
+    }
 
     // 5秒後に黒画面を表示するタイマーを開始
     _blackScreenTimer = Timer(_blackScreenDelay, () {
