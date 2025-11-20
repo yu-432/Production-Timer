@@ -13,9 +13,15 @@ class DailyStats {
   /// その日の合計作業時間（秒単位）
   final int totalSeconds;
 
+  /// カテゴリーID別の作業時間（秒単位）
+  /// キー: カテゴリーID、値: そのカテゴリーの作業秒数
+  /// 例: {'default-study': 3600, 'default-work': 7200}
+  final Map<String, int> categorySeconds;
+
   const DailyStats({
     required this.date,
     required this.totalSeconds,
+    this.categorySeconds = const {},
   });
 
   /// 作業時間を時間単位で取得（例: 1.5時間）
@@ -30,6 +36,76 @@ class DailyStats {
     } else {
       return '$minutes分';
     }
+  }
+
+  /// 秒数を「HH時間MM分」の形式にフォーマット
+  /// カテゴリー別の時間表示に使用
+  String _formatSeconds(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    if (hours > 0) {
+      return '$hours時間$minutes分';
+    } else {
+      return '$minutes分';
+    }
+  }
+
+  /// カテゴリー別の作業時間を含む詳細なツールチップメッセージを生成
+  ///
+  /// 生成される形式:
+  /// ```
+  /// X月Y日（今日）
+  /// 勉強: 1時間30分
+  /// 仕事: 2時間15分
+  /// ─────────
+  /// 合計: 3時間45分
+  /// ```
+  ///
+  /// [categories] カテゴリーのリスト（名前を表示するために使用）
+  /// [isToday] この日付が今日かどうか
+  String getDetailedTooltip({
+    required List<dynamic> categories,
+    required bool isToday,
+  }) {
+    // 日付部分（「X月Y日」または「X月Y日（今日）」）
+    final dateText = '${date.month}月${date.day}日${isToday ? '（今日）' : ''}';
+
+    // 作業時間がない場合
+    if (totalSeconds == 0) {
+      return '$dateText\n記録なし';
+    }
+
+    // カテゴリー別の時間を表示するための文字列リスト
+    final List<String> categoryLines = [];
+
+    // カテゴリーごとの作業時間を表示順でソート
+    final sortedCategories = List.from(categories)
+      ..sort((a, b) => a.order.compareTo(b.order));
+
+    for (final category in sortedCategories) {
+      final categoryId = category.id as String;
+      final seconds = categorySeconds[categoryId];
+
+      // このカテゴリーで作業時間がある場合のみ表示
+      if (seconds != null && seconds > 0) {
+        final categoryName = category.name as String;
+        final formattedTime = _formatSeconds(seconds);
+        categoryLines.add('$categoryName: $formattedTime');
+      }
+    }
+
+    // カテゴリー別の行が1つもない場合（カテゴリーIDがnullの記録のみ）
+    if (categoryLines.isEmpty) {
+      return '$dateText\n$formattedDuration';
+    }
+
+    // カテゴリー別の時間が1つしかない場合は区切り線なしで表示
+    if (categoryLines.length == 1) {
+      return '$dateText\n${categoryLines[0]}';
+    }
+
+    // 複数カテゴリーの場合は区切り線を入れて合計を表示
+    return '$dateText\n${categoryLines.join('\n')}\n─────────\n合計: $formattedDuration';
   }
 }
 
@@ -86,21 +162,39 @@ final currentMonthDailyStatsProvider = Provider<List<DailyStats>>((ref) {
   // 当月の日別の作業時間を集計するマップ（日付 → 秒数）
   final Map<DateTime, int> dailySecondsMap = {};
 
+  // 当月の日別・カテゴリー別の作業時間を集計するマップ
+  // 構造: {日付: {カテゴリーID: 秒数}}
+  // 例: {2025-01-15: {'default-study': 3600, 'default-work': 7200}}
+  final Map<DateTime, Map<String, int>> dailyCategorySecondsMap = {};
+
   // 当月の全ての日付を初期化（1日〜月末まで）
   final daysInMonth = DateTime(currentYear, currentMonth + 1, 0).day;
   for (int day = 1; day <= daysInMonth; day++) {
     final date = DateTime(currentYear, currentMonth, day);
     dailySecondsMap[date] = 0;
+    dailyCategorySecondsMap[date] = {};
   }
 
-  // 記録を日付ごとに集計
+  // 記録を日付ごと・カテゴリーごとに集計
   for (final record in records) {
     final recordDate = record.dateOnly;
 
     // 当月の記録のみを集計
     if (recordDate.year == currentYear && recordDate.month == currentMonth) {
+      // 合計時間を集計
       dailySecondsMap[recordDate] =
           (dailySecondsMap[recordDate] ?? 0) + record.durationSeconds;
+
+      // カテゴリー別の時間を集計
+      final categoryId = record.categoryId;
+      if (categoryId != null) {
+        // この日付のカテゴリー別マップを取得（なければ作成）
+        final categoryMap = dailyCategorySecondsMap[recordDate] ?? {};
+        // このカテゴリーの秒数を加算
+        categoryMap[categoryId] =
+            (categoryMap[categoryId] ?? 0) + record.durationSeconds;
+        dailyCategorySecondsMap[recordDate] = categoryMap;
+      }
     }
   }
 
@@ -109,6 +203,7 @@ final currentMonthDailyStatsProvider = Provider<List<DailyStats>>((ref) {
       .map((entry) => DailyStats(
             date: entry.key,
             totalSeconds: entry.value,
+            categorySeconds: dailyCategorySecondsMap[entry.key] ?? {},
           ))
       .toList()
     ..sort((a, b) => a.date.compareTo(b.date));

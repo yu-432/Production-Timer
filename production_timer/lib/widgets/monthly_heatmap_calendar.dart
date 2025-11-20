@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/category_provider.dart';
 import '../providers/history_stats_provider.dart';
 
 /// GitHubスタイルのヒートマップカレンダー
@@ -40,6 +41,9 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
     // 当月の日別統計を取得
     final dailyStats = ref.watch(currentMonthDailyStatsProvider);
 
+    // カテゴリーリストを取得（ツールチップでカテゴリー名を表示するために使用）
+    final categories = ref.watch(categoryListProvider);
+
     // 現在の年月を取得
     final now = DateTime.now();
     final currentYear = now.year;
@@ -67,10 +71,11 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
           dayStat.date.day == now.day;
 
       // 吹き出し形式で詳細を表示するメッセージ
-      // 作業時間がある場合は時間を表示、ない場合は「記録なし」と表示
-      final tooltipMessage = dayStat.totalSeconds > 0
-          ? '${dayStat.date.month}月${dayStat.date.day}日${isToday ? '（今日）' : ''}\n${dayStat.formattedDuration}'
-          : '${dayStat.date.month}月${dayStat.date.day}日${isToday ? '（今日）' : ''}\n記録なし';
+      // カテゴリー別の時間 + 合計時間を表示
+      final tooltipMessage = dayStat.getDetailedTooltip(
+        categories: categories,
+        isToday: isToday,
+      );
 
       calendarCells.add(
         // Tooltipウィジェットでホバー(タップ)時に吹き出し表示
@@ -128,7 +133,7 @@ class MonthlyHeatmapCalendar extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             const Text(
-              '各日をタップすると吹き出しで詳細が表示されます',
+              '各日をタップすると項目別・合計時間が表示されます',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey,
