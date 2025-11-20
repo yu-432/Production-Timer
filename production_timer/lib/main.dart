@@ -103,54 +103,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-<<<<<<< HEAD
-    // タイマーの暗転状態を監視して、タブバーも連動して暗くする
-    final timerState = ref.watch(timerControllerProvider);
-
-    return Scaffold(
-      // 現在選択されているタブの画面を表示
-      body: _screens[_currentIndex],
-      // 画面下部のナビゲーションバー
-      // 暗転時にタブバーも一緒に暗くなるよう、AnimatedOpacityでラップ
-      bottomNavigationBar: AnimatedOpacity(
-        // 暗転のフェード時間と同じ1.5秒でタブバーもフェードアウト/インさせる
-        duration: const Duration(milliseconds: 1500),
-        curve: Curves.easeInOut, // なめらかに変化
-        // 暗転中(isBlackScreenActive == true)の時は完全に透明(opacity: 0.0)にする
-        opacity: timerState.isBlackScreenActive ? 0.0 : 1.0,
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex, // 現在選択されているタブ
-          onTap: (index) {
-            // タブがタップされたら、選択タブを変更して画面を再描画
-            setState(() {
-              _currentIndex = index;
-            });
-
-            // 【重要】振り返り・設定画面からタイマー画面(index == 0)に戻った際、
-            // 暗転している場合は画面タップと同様に暗転を解除する
-            if (index == 0 && timerState.isBlackScreenActive) {
-              ref.read(timerControllerProvider.notifier).exitBlackScreen();
-            }
-          },
-          // タブの項目を定義
-          items: const [
-            // タブ0: タイマー
-            BottomNavigationBarItem(
-              icon: Icon(Icons.timer_rounded),
-              label: 'タイマー',
-            ),
-            // タブ1: 振り返り
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              label: '振り返り',
-            ),
-            // タブ2: 設定
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_rounded),
-              label: '設定',
-            ),
-          ],
-        ),
     // タイマーの状態を監視して、黒画面が有効かどうかを取得
     final timerState = ref.watch(timerControllerProvider);
 
@@ -174,6 +126,12 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
                 setState(() {
                   _currentIndex = index;
                 });
+
+                // 【重要】振り返り・設定画面からタイマー画面(index == 0)に戻った際、
+                // 暗転している場合は画面タップと同様に暗転を解除する
+                if (index == 0 && timerState.isBlackScreenActive) {
+                  ref.read(timerControllerProvider.notifier).exitBlackScreen();
+                }
               },
               // タブの項目を定義
               items: const [
@@ -217,7 +175,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             ),
           ),
         ],
->>>>>>> parent of 4841163 (暗転 (vibe-kanban 1eb11631))
       ),
     );
   }
